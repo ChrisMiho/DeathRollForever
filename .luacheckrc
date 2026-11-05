@@ -32,6 +32,8 @@ read_globals = {
 	"IsInGuild",
 	"IsInRaid",
 	"LibStub",
+	"NumberFontNormalHuge",
+	"RandomRoll",
 	"SendChatMessage",
 	"UIParent",
 	"UnitFactionGroup",

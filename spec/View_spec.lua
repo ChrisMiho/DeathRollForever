@@ -1,14 +1,16 @@
 describe("View", function()
 	local View
-	local Money, Parse
+	local Money, Parse, Rules
 
 	before_each(function()
 		local ns = LoadAddonFile("src/Money.lua")
 		LoadAddonFile("src/Parse.lua", ns)
+		LoadAddonFile("src/Rules.lua", ns)
 		LoadAddonFile("src/View.lua", ns)
 		View = ns.View
 		Money = ns.Money
 		Parse = ns.Parse
+		Rules = ns.Rules
 	end)
 
 	-- 01-window (package 06): TINT, State, ChatName, Subtitle.
@@ -124,6 +126,178 @@ describe("View", function()
 				assert.has_error(function()
 					View.StartOpts("WHISPER", "1g", "")
 				end)
+			end)
+		end)
+	end)
+
+	-- 03-in-progress (package 08): Lobby, Game.
+	describe("in progress (03-in-progress)", function()
+		local lobby, rolling
+
+		-- The lobby fixture comes from Rules: host Eve, raid, 1g, first roll
+		-- 1000, created at 1000, with Alice, Bob and Eve joined in that order.
+		local function newLobby()
+			local game = Rules.New({
+				host = "Eve",
+				channel = "RAID",
+				wager = 10000,
+				startRoll = 1000,
+				joinWord = "1",
+				joinTime = 60,
+				turnTimer = 45,
+			}, 1000)
+			Rules.Join(game, "Alice", 1001)
+			Rules.Join(game, "Bob", 1002)
+			Rules.Join(game, "Eve", 1003)
+			return game
+		end
+
+		-- The rolling fixture is built by hand as the document lists it.
+		local function newRolling()
+			return {
+				host = "Eve",
+				channel = "RAID",
+				wager = 10000,
+				startRoll = 1000,
+				joinWord = "1",
+				joinTime = 60,
+				turnTimer = 45,
+				phase = "rolling",
+				joined = { "Alice", "Bob", "Carl", "Dan", "Eve" },
+				order = { "Alice", "Bob", "Carl", "Dan", "Eve" },
+				status = { Alice = "in", Bob = "in", Carl = "out", Dan = "in", Eve = "in" },
+				eliminated = { "Carl" },
+				turn = 2,
+				range = 734,
+				turnDeadline = 1045,
+				remindersSent = {},
+				rolls = { { name = "Alice", roll = 734, max = 1000 } },
+			}
+		end
+
+		before_each(function()
+			lobby = newLobby()
+			rolling = newRolling()
+		end)
+
+		describe("Lobby", function()
+			it("AC-08-01 counts the seconds left, the fraction and the joined", function()
+				local model = View.Lobby(lobby, "Eve", 1018)
+				assert.are.equal(42, model.secondsLeft)
+				assert.is_near(0.7, model.fraction, 0.001)
+				assert.are.equal(3, model.count)
+			end)
+
+			it("AC-08-02 one row per joined player in join order, (you) on the host", function()
+				assert.are.same({
+					{ n = 1, name = "Alice", you = false },
+					{ n = 2, name = "Bob", you = false },
+					{ n = 3, name = "Eve", you = true },
+				}, View.Lobby(lobby, "Eve", 1018).rows)
+			end)
+
+			it("AC-08-03 the status line names the join word and the chat", function()
+				assert.are.equal("Type 1 in raid chat to join", View.Lobby(lobby, "Eve", 1018).status)
+			end)
+
+			it("AC-08-04 the seconds left round up", function()
+				assert.are.equal(60, View.Lobby(lobby, "Eve", 1000.2).secondsLeft)
+			end)
+
+			it("AC-08-05 past the deadline the seconds left and the fraction are 0", function()
+				local model = View.Lobby(lobby, "Eve", 1070)
+				assert.are.equal(0, model.secondsLeft)
+				assert.are.equal(0, model.fraction)
+			end)
+
+			it("AC-08-06 the subtitle is View.Subtitle", function()
+				assert.are.equal(
+					"Raid chat, 1g per person, first roll 1-1000",
+					View.Lobby(lobby, "Eve", 1018).subtitle
+				)
+			end)
+		end)
+
+		describe("Game", function()
+			it("AC-08-07 a player who rolled shows their last roll", function()
+				assert.are.same(
+					{ n = 1, name = "Alice", you = false, current = false, out = false, value = "734" },
+					View.Game(rolling, "Eve", 1014).rows[1]
+				)
+			end)
+
+			it("AC-08-08 the current player shows the range to roll", function()
+				assert.are.same(
+					{ n = 2, name = "Bob", you = false, current = true, out = false, value = "1-734" },
+					View.Game(rolling, "Eve", 1014).rows[2]
+				)
+			end)
+
+			it("AC-08-09 a player who rolled 1 is out", function()
+				assert.are.same(
+					{ n = 3, name = "Carl", you = false, current = false, out = true, value = "out" },
+					View.Game(rolling, "Eve", 1014).rows[3]
+				)
+			end)
+
+			it("AC-08-10 the host who has not rolled shows an empty value and (you)", function()
+				assert.are.same(
+					{ n = 5, name = "Eve", you = true, current = false, out = false, value = "" },
+					View.Game(rolling, "Eve", 1014).rows[5]
+				)
+			end)
+
+			it("AC-08-11 the status line names the current player and the range", function()
+				assert.are.equal("Bob is up: /roll 734", View.Game(rolling, "Eve", 1014).status)
+			end)
+
+			it("AC-08-12 counts the seconds left in the turn and the fraction", function()
+				local model = View.Game(rolling, "Eve", 1014)
+				assert.are.equal(31, model.secondsLeft)
+				assert.is_near(31 / 45, model.fraction, 0.001)
+			end)
+
+			it("AC-08-13 the button reads the range and is disabled on another player's turn", function()
+				assert.are.same({ label = "Roll 1-734", enabled = false, range = 734 }, View.Game(rolling, "Eve", 1014).button)
+			end)
+
+			it("AC-08-14 on the host's turn the status says You, the button is enabled and the row is current", function()
+				rolling.turn = 5
+				local model = View.Game(rolling, "Eve", 1014)
+				assert.are.equal("You are up: /roll 734", model.status)
+				assert.is_true(model.button.enabled)
+				assert.is_true(model.rows[5].current)
+				assert.are.equal("1-734", model.rows[5].value)
+			end)
+
+			it("AC-08-15 a player with two rolls shows the later one", function()
+				table.insert(rolling.rolls, { name = "Bob", roll = 500, max = 734 })
+				table.insert(rolling.rolls, { name = "Alice", roll = 120, max = 500 })
+				rolling.range = 120
+				rolling.turn = 4
+				assert.are.equal("120", View.Game(rolling, "Eve", 1014).rows[1].value)
+			end)
+
+			it("AC-08-16 a forfeited player is out", function()
+				rolling.status.Dan = "forfeit"
+				local row = View.Game(rolling, "Eve", 1014).rows[4]
+				assert.is_true(row.out)
+				assert.are.equal("out", row.value)
+			end)
+
+			it("AC-08-17 past the turn deadline the seconds left and the fraction are 0", function()
+				local model = View.Game(rolling, "Eve", 1100)
+				assert.are.equal(0, model.secondsLeft)
+				assert.are.equal(0, model.fraction)
+			end)
+		end)
+
+		it("AC-08-18 Lobby on a rolling game and Game on a lobby game raise", function()
+			assert.has_error(function()
+				View.Lobby(rolling, "Eve", 1014)
+			end)
+			assert.has_error(function()
+				View.Game(lobby, "Eve", 1018)
 			end)
 		end)
 	end)
