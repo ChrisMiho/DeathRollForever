@@ -22,6 +22,7 @@ ignore:
   - spec
   - scripts
   - PRD.md
+  - CLAUDE.md
 
 manual-changelog:
   filename: CHANGELOG.md
