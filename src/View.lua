@@ -58,6 +58,29 @@ end
 
 -- 02-form (package 07): StartOpts.
 
+local COMMAND_KEY = {
+	GUILD = "g",
+	PARTY = "p",
+	RAID = "r",
+}
+
+-- The form's three inputs as the opts Parse.StartArgs returns:
+-- { channel, wager, startRoll } or nil, errorText. The wager is passed whole
+-- (Money.Parse accepts "1g 50s"); the first roll is trimmed and left out when
+-- empty. Any other channel is a programmer mistake.
+function View.StartOpts(channel, wagerText, startRollText)
+	local key = COMMAND_KEY[channel]
+	if not key then
+		error("StartOpts: unknown channel " .. tostring(channel), 2)
+	end
+	local args = { wagerText }
+	local startRoll = (startRollText or ""):match("^%s*(.-)%s*$")
+	if startRoll ~= "" then
+		args[2] = startRoll
+	end
+	return ns.Parse.StartArgs(key, args)
+end
+
 -- 03-in-progress (package 08): Lobby, Game.
 
 -- 04-winner (package 09): Result.
