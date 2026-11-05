@@ -108,19 +108,19 @@ local shown -- the state currently drawn, or nil before the first redraw
 -- Hooks the state packages fill: build[state](parent) once at build,
 -- draw[state](game, now) on every redraw, onMain[state]() on a main button click.
 local build = {
-	form = function() end, -- 02-form (package 07)
+	form = nil, -- 02-form (package 07): set below
 	lobby = function() end, -- 03-in-progress (package 08)
 	rolling = function() end, -- 03-in-progress (package 08)
 	winner = function() end, -- 04-winner (package 09)
 }
 local draw = {
-	form = function() end, -- 02-form (package 07)
+	form = nil, -- 02-form (package 07): set below
 	lobby = function() end, -- 03-in-progress (package 08)
 	rolling = function() end, -- 03-in-progress (package 08)
 	winner = function() end, -- 04-winner (package 09)
 }
 local onMain = {
-	form = function() end, -- 02-form (package 07)
+	form = nil, -- 02-form (package 07): set below
 	lobby = function() end, -- nothing: the button is gray
 	rolling = function() end, -- 03-in-progress (package 08)
 	winner = nil, -- set below: forget the game and redraw
@@ -283,6 +283,185 @@ local function cancel()
 	local ok, cancelError = ns.Host.Cancel()
 	if not ok then
 		ns.Print(cancelError)
+	end
+end
+
+-- 02-form (package 07): the form. Chat, wager, first roll and the note; the
+-- main button reads Start. Spec: docs/prd/visual/02-form.md.
+
+-- Exact user-facing text of the form (02-form.md). The note's chat name and
+-- numbers come from View.ChatName and Rules.DEFAULTS.
+local FORM_TEXT = {
+	chat = "Chat",
+	wager = "Wager per person",
+	firstRoll = "First roll",
+	hint = "1g, 50s, 1g50s or 1.5g",
+	note = "Players join by typing %s in %s chat. %s s to join, %s s per turn.",
+	wagerDefault = "1g",
+	firstRollDefault = "1000",
+}
+
+local CHAT_BUTTONS = {
+	{ channel = "GUILD", label = "Guild" },
+	{ channel = "PARTY", label = "Party" },
+	{ channel = "RAID", label = "Raid" },
+}
+
+-- Sizes the shell has no name for.
+local FORM_LAYOUT = {
+	labelGap = 5, -- label to its input
+	chatHeight = 30, -- the chat strip
+	boxHeight = 20, -- InputBoxTemplate's art is 20 px tall
+	boxArtLeft = 5, -- the template's left art sits this far left of the box
+	wagerLetters = 20,
+	firstRollLetters = 7,
+}
+
+local form = {} -- the form's parts and its selected channel; filled by build.form
+
+-- A muted label in the body font.
+local function newLabel(parent, text)
+	local label = parent:CreateFontString(nil, "OVERLAY")
+	label:SetFontObject(GameFontHighlight)
+	label:SetTextColor(unpack(PALETTE.muted))
+	label:SetText(text)
+	return label
+end
+
+-- An InputBoxTemplate edit box, full content width, auto-focus off
+-- [P0-TEMPLATES], over a box-coloured background (visual.md 4.2).
+local function newEditBox(parent, maxLetters)
+	local box = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
+	box:SetAutoFocus(false)
+	box:SetMaxLetters(maxLetters)
+	box:SetHeight(FORM_LAYOUT.boxHeight)
+	local bg = colourTexture(box, "BACKGROUND", PALETTE.box)
+	bg:SetDrawLayer("BACKGROUND", -1) -- under the template's border art
+	bg:SetPoint("TOPLEFT", box, "TOPLEFT", -FORM_LAYOUT.boxArtLeft, 0)
+	bg:SetPoint("BOTTOMRIGHT", box, "BOTTOMRIGHT", 0, 0)
+	box:SetScript("OnEnterPressed", function()
+		onMain.form()
+	end)
+	return box
+end
+
+-- Selects a chat: paints the three buttons and rewrites the note.
+local function selectChat(channel)
+	form.channel = channel
+	for _, button in ipairs(form.chatButtons) do
+		if button.channel == channel then
+			paintButton(button, shell.tint.title, lighten(shell.tint.title), PALETTE.text)
+		else
+			paintButton(button, PALETTE.box, lighten(PALETTE.box), PALETTE.muted)
+		end
+	end
+	local defaults = ns.Rules.DEFAULTS
+	form.note:SetText(string.format(
+		FORM_TEXT.note,
+		defaults.joinWord,
+		ns.View.ChatName(channel),
+		defaults.joinTime,
+		defaults.turnTimer
+	))
+end
+
+function build.form(parent)
+	local gap = LAYOUT.gap
+	local labelGap = FORM_LAYOUT.labelGap
+
+	-- 1. Chat: three flat buttons in a box-coloured strip.
+	local chatLabel = newLabel(parent, FORM_TEXT.chat)
+	chatLabel:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, 0)
+
+	local strip = CreateFrame("Frame", nil, parent)
+	strip:SetPoint("TOPLEFT", chatLabel, "BOTTOMLEFT", 0, -labelGap)
+	strip:SetPoint("RIGHT", parent, "RIGHT", 0, 0)
+	strip:SetHeight(FORM_LAYOUT.chatHeight)
+	colourTexture(strip, "BACKGROUND", PALETTE.box):SetAllPoints()
+
+	form.chatButtons = {}
+	for i, spec in ipairs(CHAT_BUTTONS) do
+		local button = newFlatButton(strip, GameFontHighlight)
+		button.channel = spec.channel
+		button.label:SetText(spec.label)
+		button:SetPoint("TOP", strip, "TOP", 0, 0)
+		button:SetPoint("BOTTOM", strip, "BOTTOM", 0, 0)
+		if i == 1 then
+			button:SetPoint("LEFT", strip, "LEFT", 0, 0)
+		else
+			button:SetPoint("LEFT", form.chatButtons[i - 1], "RIGHT", 0, 0)
+		end
+		button:SetScript("OnClick", function(self)
+			selectChat(self.channel)
+		end)
+		form.chatButtons[i] = button
+	end
+	local function sizeChatButtons(_, width)
+		local each = width / #form.chatButtons
+		for _, button in ipairs(form.chatButtons) do
+			button:SetWidth(each)
+		end
+	end
+	strip:SetScript("OnSizeChanged", sizeChatButtons)
+	if strip:GetWidth() > 0 then
+		sizeChatButtons(strip, strip:GetWidth())
+	end
+
+	-- 2. Wager per person: an edit box with a hint under it.
+	local wagerLabel = newLabel(parent, FORM_TEXT.wager)
+	wagerLabel:SetPoint("TOPLEFT", strip, "BOTTOMLEFT", 0, -gap)
+
+	local wagerBox = newEditBox(parent, FORM_LAYOUT.wagerLetters)
+	form.wagerBox = wagerBox
+	wagerBox:SetPoint("TOPLEFT", wagerLabel, "BOTTOMLEFT", FORM_LAYOUT.boxArtLeft, -labelGap)
+	wagerBox:SetPoint("RIGHT", parent, "RIGHT", 0, 0)
+	wagerBox:SetText(FORM_TEXT.wagerDefault)
+
+	local hint = parent:CreateFontString(nil, "OVERLAY")
+	hint:SetFontObject(GameFontDisable)
+	hint:SetTextColor(unpack(PALETTE.muted))
+	hint:SetText(FORM_TEXT.hint)
+	hint:SetPoint("TOPLEFT", wagerBox, "BOTTOMLEFT", -FORM_LAYOUT.boxArtLeft, -labelGap)
+
+	-- 3. First roll: a numeric edit box.
+	local firstRollLabel = newLabel(parent, FORM_TEXT.firstRoll)
+	firstRollLabel:SetPoint("TOPLEFT", hint, "BOTTOMLEFT", 0, -gap)
+
+	local firstRollBox = newEditBox(parent, FORM_LAYOUT.firstRollLetters)
+	form.firstRollBox = firstRollBox
+	firstRollBox:SetNumeric(true)
+	firstRollBox:SetPoint("TOPLEFT", firstRollLabel, "BOTTOMLEFT", FORM_LAYOUT.boxArtLeft, -labelGap)
+	firstRollBox:SetPoint("RIGHT", parent, "RIGHT", 0, 0)
+	firstRollBox:SetText(FORM_TEXT.firstRollDefault)
+
+	-- 4. The note, anchored above the main button.
+	local note = parent:CreateFontString(nil, "OVERLAY")
+	form.note = note
+	note:SetFontObject(GameFontDisable)
+	note:SetTextColor(unpack(PALETTE.muted))
+	note:SetJustifyH("LEFT")
+	note:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 0, 0)
+	note:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
+
+	selectChat(CHAT_BUTTONS[1].channel)
+end
+
+-- The form's values are its own, not the game's: nothing to copy, only the
+-- selected chat's paint and the note to refresh.
+function draw.form()
+	selectChat(form.channel)
+end
+
+-- Start: what /dr g <wager> [first roll] does. Errors print through ns.Print.
+function onMain.form()
+	local opts, optsError = ns.View.StartOpts(form.channel, form.wagerBox:GetText(), form.firstRollBox:GetText())
+	if not opts then
+		ns.Print(optsError)
+		return
+	end
+	local ok, startError = ns.Host.Start(opts)
+	if not ok then
+		ns.Print(startError)
 	end
 end
 

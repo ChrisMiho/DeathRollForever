@@ -1,10 +1,14 @@
 describe("View", function()
 	local View
+	local Money, Parse
 
 	before_each(function()
 		local ns = LoadAddonFile("src/Money.lua")
+		LoadAddonFile("src/Parse.lua", ns)
 		LoadAddonFile("src/View.lua", ns)
 		View = ns.View
+		Money = ns.Money
+		Parse = ns.Parse
 	end)
 
 	-- 01-window (package 06): TINT, State, ChatName, Subtitle.
@@ -70,6 +74,56 @@ describe("View", function()
 						end
 					end
 				end
+			end)
+		end)
+	end)
+
+	-- 02-form (package 07): StartOpts.
+	describe("form (02-form)", function()
+		describe("StartOpts", function()
+			it("AC-07-01 guild, 1g and 1000 give the full opts", function()
+				assert.are.same(
+					{ channel = "GUILD", wager = 10000, startRoll = 1000 },
+					View.StartOpts("GUILD", "1g", "1000")
+				)
+			end)
+
+			it("AC-07-02 an empty first roll leaves startRoll nil", function()
+				local opts, err = View.StartOpts("PARTY", "50s", "")
+				assert.is_nil(err)
+				assert.are.same({ channel = "PARTY", wager = 5000 }, opts)
+				assert.is_nil(opts.startRoll)
+			end)
+
+			it("AC-07-03 the wager is passed whole and the first roll is trimmed", function()
+				assert.are.same(
+					{ channel = "RAID", wager = 15000, startRoll = 500 },
+					View.StartOpts("RAID", "1g 50s", "  500 ")
+				)
+			end)
+
+			it("AC-07-04 a bad wager gives Money.ERROR", function()
+				local opts, err = View.StartOpts("GUILD", "abc", "1000")
+				assert.is_nil(opts)
+				assert.are.equal(Money.ERROR, err)
+			end)
+
+			it("AC-07-05 a first roll of 1 gives Parse.FIRST_ROLL_ERROR", function()
+				local opts, err = View.StartOpts("GUILD", "1g", "1")
+				assert.is_nil(opts)
+				assert.are.equal(Parse.FIRST_ROLL_ERROR, err)
+			end)
+
+			it("AC-07-06 an empty wager gives Money.ERROR", function()
+				local opts, err = View.StartOpts("GUILD", "", "")
+				assert.is_nil(opts)
+				assert.are.equal(Money.ERROR, err)
+			end)
+
+			it("AC-07-07 an unknown channel raises", function()
+				assert.has_error(function()
+					View.StartOpts("WHISPER", "1g", "")
+				end)
 			end)
 		end)
 	end)
