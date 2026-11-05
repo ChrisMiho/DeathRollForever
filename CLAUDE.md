@@ -1,8 +1,15 @@
 # DeathRollForever
 
 World of Warcraft: Forever addon (Lua 5.1, Interface 16001) that runs death
-roll events in party, raid or guild chat. The design lives in `PRD.md`; read the
-sections relevant to your task before writing code.
+roll events in party, raid or guild chat. `PRD.md` is the product overview.
+
+## Specs
+
+Behaviour is specified under `docs/prd/`. Start at `docs/prd/README.md`: it
+maps every `src/` file to the document that owns it. Load that document and
+`docs/prd/contracts.md`, and nothing else from the folder. A change to
+behaviour is not done until the owning document agrees with the code, and a
+change to `contracts.md` needs the human's approval.
 
 ## Commands
 
