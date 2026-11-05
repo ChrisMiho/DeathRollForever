@@ -35,8 +35,8 @@ Every line starts with `[DeathRoll] `. Examples use wager 1g, first roll 1000.
 
 | Event | Line |
 |-------|------|
-| `kickoff` | `Death roll starting! 1g per person, first roll 1-1000. Type 1 here to join. 60 seconds! (45s per turn)` |
-| `kickoff`, optional `[P0-DISTANCE]` | `... (45s per turn) Stay near the host so your rolls are seen.` |
+| `kickoff` | `Death roll starting! 1g per person, first roll 1-1000. Type 1 here to join. 60 seconds! (45s per turn) Stay near the host so your rolls are seen.` |
+| `kickoff`, last sentence `[P0-DISTANCE]` | `Stay near the host so your rolls are seen.` is always part of the kickoff line in v1 (Phase 0 showed far-away ungrouped rolls are not seen) |
 | `countdown` | `30 seconds left to join! 4 in: Alice, Bob, Carl, Dan` |
 | `countdown`, nobody yet | `30 seconds left to join! 0 in` |
 | `closed` | `Joining closed! 5 players in: Alice, Bob, Carl, Dan, Eve` |
@@ -78,8 +78,8 @@ joinTime 60, turnTimer 45.
 
 | ID | Event | Expected single line (after the prefix) |
 |----|-------|------------------------------------------|
-| AC-04-01 | `kickoff` | `Death roll starting! 1g per person, first roll 1-1000. Type 1 here to join. 60 seconds! (45s per turn)` |
-| AC-04-02 | `kickoff` with wager 15045, startRoll 500, joinWord "roll" | `Death roll starting! 1g 50s 45c per person, first roll 1-500. Type roll here to join. 60 seconds! (45s per turn)` |
+| AC-04-01 | `kickoff` | `Death roll starting! 1g per person, first roll 1-1000. Type 1 here to join. 60 seconds! (45s per turn) Stay near the host so your rolls are seen.` |
+| AC-04-02 | `kickoff` with wager 15045, startRoll 500, joinWord "roll" | `Death roll starting! 1g 50s 45c per person, first roll 1-500. Type roll here to join. 60 seconds! (45s per turn) Stay near the host so your rolls are seen.` |
 | AC-04-03 | `countdown{secondsLeft=30, names={"Alice","Bob"}}` | `30 seconds left to join! 2 in: Alice, Bob` |
 | AC-04-04 | `countdown{secondsLeft=5, names={}}` | `5 seconds left to join! 0 in` |
 | AC-04-05 | `closed{joined={"Alice","Bob","Carl"}}` | `Joining closed! 3 players in: Alice, Bob, Carl` |
@@ -109,4 +109,4 @@ None in v1.
 
 ## Open questions
 
-None, apart from the optional `[P0-DISTANCE]` sentence.
+None. The `[P0-DISTANCE]` sentence was decided on 2026-11-05: always on.
