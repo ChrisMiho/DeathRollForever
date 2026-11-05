@@ -1,6 +1,6 @@
 # 05 Host controller: slash commands, chat in, lines out, the ticker
 
-Status: v1 implemented. Last verified against code: 2026-11-05. Owns `src/Host.lua`, `src/Init.lua`.
+Status: v1 implemented; v2 additions draft (section "v2 additions" below). Last verified against code: 2026-11-05. Owns `src/Host.lua`, `src/Init.lua`.
 
 ## Purpose and scope
 
@@ -156,10 +156,51 @@ party with two alts on second accounts. Note what you see against each line.
 | IG-05-21 | `/dr r 50s` in a raid with players across the zone | works like guild; countdown and calls are seen by all |
 | IG-05-22 | `/reload` mid-game | the game is gone; `/dr cancel` says `No game is running.` (v1 limitation, expected) |
 
+## v2 additions
+
+Added by the orchestrator in v2 scaffolding (Phase 1 of
+[orchestration.md](../orchestration.md)), not by a package. Everything above
+is unchanged.
+
+### `Host.OnChange(fn)` (`Host.lua`)
+
+Stores `fn` in a local; a second call replaces the first. `Host` calls
+`fn(game)`:
+
+- at the end of `Host.Start`, after the kickoff is posted and the ticker
+  started;
+- at the end of `post`, after the lines are sent and **before** `stop()`
+  drops a game that is no longer live;
+- at the end of every `tick`, even when `Rules.Tick` returned no events (the
+  window redraws its countdown from this).
+
+`fn` is never called with `nil`, and never when `Host.Start` returned an
+error. Errors raised inside `fn` are not caught: a broken window breaks
+loudly in the host's own client, which is what we want during development.
+
+### `/dr show` (`Init.lua`)
+
+| `name` | Action |
+|--------|--------|
+| `show` | `ns.UI.Show()` |
+
+The help lines gain one line, before `/dr help`:
+
+```
+/dr show                     open the window
+```
+
+### In-game (manual)
+
+| ID | Do | Expect |
+|----|----|--------|
+| IG-05-23 | `/dr help` | six lines, `/dr show` among them |
+| IG-05-24 | `/dr show` | the window opens (01-window's IG-06-01) |
+
 ## Mockup references
 
-None in v1.
+None.
 
 ## Open questions
 
-None, once Phase 0 is answered.
+None.

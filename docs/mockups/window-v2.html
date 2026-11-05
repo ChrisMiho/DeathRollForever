@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeathRoll Host Window</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: four flat dark windows in a wrapping row, toolbar above for faction and turn toggles. Single dark theme by choice: a mockup of in-game frames. */
+:root {
+	color-scheme: dark;
+	--page: #111218;
+	--page-fg: #d6d7de;
+	--page-muted: #80828f;
+	--win: #1b1c23;
+	--win-border: #2c2e38;
+	--row: #24262f;
+	--row-border: #2f313c;
+	--text: #ecedf2;
+	--muted: #8b8d99;
+	--disabled: #767884;
+	--disabled-bg: #2e303a;
+	--danger: #ff5c5c;
+	--tint: #2a63d8;
+	--tint-deep: #1d4db0;
+	--tint-text: #8db4ff;
+	--font: "Inter", "Segoe UI", system-ui, sans-serif;
+}
+:root[data-faction="horde"] {
+	--tint: #d43b3b;
+	--tint-deep: #7d1c1c;
+	--tint-text: #ff9c9c;
+}
+html, body { background: var(--page); color: var(--page-fg); }
+body {
+	font-family: var(--font);
+	padding-block: 24px 48px;
+	padding-left: max(16px, env(safe-area-inset-left, 0px));
+	padding-right: max(16px, env(safe-area-inset-right, 0px));
+	min-height: 100%;
+}
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; max-width: 1320px; margin: 0 auto 24px; }
+.toolbar h1 { font: 600 20px/1.2 var(--font); color: var(--text); margin: 0; text-wrap: balance; }
+.toolbar p { margin: 0; color: var(--page-muted); font-size: 14px; flex-basis: 100%; max-width: 70ch; }
+.seg { display: inline-flex; background: var(--row); border-radius: 8px; padding: 3px; gap: 2px; }
+.seg button { font: 600 13px/1 var(--font); background: transparent; color: var(--muted); border: 0; border-radius: 6px; padding: 7px 14px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--tint); color: #fff; }
+.seg button:focus-visible, .check input:focus-visible, .btn:focus-visible, .input:focus-visible { outline: 2px solid var(--tint-text); outline-offset: 2px; }
+.check { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+.check input { accent-color: var(--tint); width: 16px; height: 16px; }
+
+.table { display: flex; flex-wrap: wrap; gap: 28px 24px; justify-content: center; max-width: 1320px; margin: 0 auto; }
+.panel { display: flex; flex-direction: column; gap: 10px; width: 300px; max-width: 100%; }
+.panel > h2 { font: 600 13px/1.2 var(--font); color: var(--page-fg); margin: 0; letter-spacing: .08em; text-transform: uppercase; }
+.panel > h2 small { display: block; font: 400 13px/1.3 var(--font); color: var(--page-muted); text-transform: none; letter-spacing: 0; margin-top: 3px; }
+.panel > p { margin: 0; font-size: 13px; line-height: 1.45; color: var(--page-muted); }
+.panel code { font-size: 12px; color: var(--page-fg); }
+
+/* The window */
+.win {
+	background: var(--win); border: 1px solid var(--win-border); border-radius: 12px;
+	box-shadow: 0 10px 30px rgba(0,0,0,.45); color: var(--text); font-size: 14px;
+	display: flex; flex-direction: column; overflow: hidden;
+	height: 420px; width: 300px; max-width: 100%; min-width: 240px; min-height: 320px; max-height: 640px;
+	resize: both; position: relative;
+}
+.win::after { content: ""; position: absolute; right: 4px; bottom: 4px; width: 12px; height: 12px; pointer-events: none;
+	background: repeating-linear-gradient(135deg, transparent 0 4px, var(--muted) 4px 5.5px); clip-path: polygon(100% 0, 100% 100%, 0 100%); opacity: .7; }
+.list { overflow-y: auto; min-height: 0; }
+.body { min-height: 0; }
+.title { display: flex; align-items: center; gap: 8px; background: var(--tint-deep); padding: 10px 12px 10px 12px; cursor: move; }
+.title svg { width: 16px; height: 16px; fill: none; stroke: #fff; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; flex: 0 0 auto; }
+.title span { font-weight: 600; font-size: 15px; color: #fff; flex: 1; }
+
+.cancel { background: rgba(255,255,255,.16); border: 0; color: #fff; font: 600 12px/1 var(--font); padding: 5px 9px; border-radius: 6px; cursor: pointer; }
+.cancel:hover { background: rgba(255,255,255,.28); }
+.close { background: none; border: 0; color: #fff; opacity: .8; font-size: 18px; line-height: 1; padding: 2px 6px; cursor: pointer; border-radius: 6px; }
+.close:hover { opacity: 1; background: rgba(255,255,255,.16); }
+.body { padding: 12px 12px 8px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.foot { display: flex; align-items: center; gap: 10px; padding: 4px 12px 12px; }
+.sub { color: var(--muted); font-size: 13.5px; }
+.faction { text-align: center; color: var(--muted); font-size: 12.5px; padding-bottom: 10px; margin-top: -4px; }
+
+/* Buttons */
+.btn {
+	font: 600 15px/1 var(--font); color: #fff; background: var(--tint); border: 0; border-radius: 8px;
+	padding: 13px 14px; cursor: pointer; flex: 1;
+}
+.btn[disabled] { background: var(--disabled-bg); color: var(--disabled); cursor: default; }
+.link { background: none; border: 0; color: var(--muted); font: 500 13px/1 var(--font); padding: 8px 10px; cursor: pointer; border-radius: 6px; }
+.link:hover { color: var(--text); background: var(--row); }
+
+/* Form */
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field label { font-size: 12.5px; color: var(--muted); font-weight: 500; }
+.input { background: var(--row); border: 1px solid var(--row-border); color: var(--text); font: 500 14px/1 var(--font); padding: 9px 10px; border-radius: 8px; width: 100%; box-sizing: border-box; }
+.chat { display: flex; background: var(--row); border-radius: 8px; padding: 3px; gap: 2px; }
+.chat button { flex: 1; font: 600 13px/1 var(--font); color: var(--muted); background: transparent; border: 0; border-radius: 6px; padding: 8px 0; cursor: pointer; }
+.chat button[aria-pressed="true"] { background: var(--tint); color: #fff; }
+.hint { color: var(--muted); font-size: 12px; margin-top: -2px; }
+
+/* Lists */
+.list { list-style: none; margin: 0; padding: 4px; display: flex; flex-direction: column; gap: 2px; background: var(--row); border-radius: 8px; }
+.list li { display: flex; align-items: baseline; gap: 6px; padding: 5px 8px; border-radius: 6px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.list li .n { color: var(--muted); font-weight: 500; }
+.list li .name { flex: 1; min-width: 0; }
+.list li .tag { color: var(--muted); font-weight: 400; font-size: 13px; }
+.list li .v { color: var(--muted); font-weight: 500; }
+.list li.cur { background: var(--tint-deep); color: #fff; }
+.list li.cur .n, .list li.cur .tag, .list li.cur .v { color: #fff; }
+.list li.cur .tag { opacity: .85; }
+.list li.out { color: var(--disabled); text-decoration: line-through; }
+.list li.out .v { color: var(--disabled); }
+.h { font-size: 12.5px; color: var(--muted); font-weight: 500; display: flex; justify-content: space-between; }
+
+/* Status + bar */
+.status { font-weight: 700; font-size: 14px; color: var(--tint-text); }
+.status.plain { color: var(--text); }
+.bar { height: 6px; background: var(--row); border-radius: 3px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: var(--w); background: var(--tint); border-radius: 3px; }
+
+/* Lobby */
+.count { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0 2px; text-align: center; }
+.count .big { font-size: 44px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; color: var(--tint-text); }
+.count .l { color: var(--muted); font-size: 12.5px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; }
+
+/* Winner */
+.winner { padding: 6px 0 2px; }
+.winner .l { display: block; font-size: 12.5px; color: var(--muted); font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
+.winner .name { display: block; font-size: 30px; font-weight: 700; color: var(--tint-text); line-height: 1.2; }
+.list li.total { border-top: 1px solid var(--row-border); border-radius: 0; margin-top: 2px; padding-top: 8px; color: var(--muted); }
+.list .m { color: var(--text); font-weight: 600; }
+
+@media (prefers-reduced-motion: no-preference) { .bar i { transition: width .3s; } }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+	<h1>DeathRollForever host window, v2 mockup</h1>
+	<div class="seg" role="group" aria-label="Faction tint">
+		<button type="button" aria-pressed="true" data-faction="alliance">Alliance</button>
+		<button type="button" aria-pressed="false" data-faction="horde">Horde</button>
+	</div>
+	<label class="check"><input type="checkbox" id="my-turn"> It is the host's turn</label>
+	<p>One movable window, 300 by 420 px by default and the same size in every state; a grip in the bottom-right corner resizes it (try it) and long lists scroll inside. The corner holds an X to close it when no game is live and Cancel while one is; the window stays open during a game. /dr show opens it on the form. The main button reads Start, Roll or Reset by state. The tint and the icon come from the host's own faction.</p>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+	<symbol id="i-alliance" viewBox="0 0 24 24"><path d="M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3z"/></symbol>
+	<symbol id="i-horde" viewBox="0 0 24 24"><path d="M12 3c1 3 4 4 4 8a4 4 0 0 1-8 0c0-1 .3-2 1-3 0 2 1 3 2 3 0-3-1-5 1-8z"/><path d="M8 14a5 5 0 0 0 8 0"/></symbol>
+</svg>
+
+<div class="table">
+
+	<section class="panel" aria-labelledby="p1">
+		<h2 id="p1">1. Form <small>No game. Last game's values filled in.</small></h2>
+		<div class="win">
+			<div class="title"><svg><use href="#i-alliance" class="ic"/></svg><span>Death roll</span><button type="button" class="close" aria-label="Close">×</button></div>
+			<div class="body">
+				<div class="field"><label for="chat">Chat</label>
+					<div class="chat" id="chat" role="group">
+						<button type="button" aria-pressed="false">Guild</button>
+						<button type="button" aria-pressed="false">Party</button>
+						<button type="button" aria-pressed="true">Raid</button>
+					</div>
+				</div>
+				<div class="field"><label for="wager">Wager per person</label><input class="input" id="wager" value="1g"><div class="hint">1g, 50s, 1g50s or 1.5g</div></div>
+				<div class="field"><label for="first">First roll</label><input class="input" id="first" value="1000"></div>
+				<div class="sub" style="margin-top:auto">Players join by typing <b>1</b> in raid chat. 60 s to join, 45 s per turn.</div>
+			</div>
+			<div class="foot"><button type="button" class="btn">Start</button></div>
+			<div class="faction" id="fac1">Alliance</div>
+		</div>
+		<p>Start does what <code>/dr r 1g 1000</code> does. Errors (bad wager, not in a raid) print to your chat frame as today.</p>
+	</section>
+
+	<section class="panel" aria-labelledby="p2">
+		<h2 id="p2">2a. In progress, lobby <small>Opens when the game starts.</small></h2>
+		<div class="win">
+			<div class="title"><svg><use href="#i-alliance" class="ic"/></svg><span>Death roll</span><button type="button" class="cancel">Cancel</button></div>
+			<div class="body">
+				<div class="sub">Raid chat, 1g per person, first roll 1-1000</div>
+				<div class="count"><span class="big">42</span><span class="l">seconds left to join</span></div>
+				<div class="bar"><i style="--w:70%"></i></div>
+				<div class="h"><span>Joined</span><span>3</span></div>
+				<ul class="list">
+					<li><span class="n">1.</span><span class="name">Alice</span></li>
+					<li><span class="n">2.</span><span class="name">Bob</span></li>
+					<li><span class="n">3.</span><span class="name">Eve <span class="tag">(you)</span></span></li>
+				</ul>
+				<div class="status plain" style="margin-top:auto">Type <span style="color:var(--tint-text)">1</span> in raid chat to join</div>
+			</div>
+			<div class="foot"><button type="button" class="btn" disabled>Roll</button></div>
+			<div class="faction">Alliance</div>
+		</div>
+		<p>Roll is gray during the lobby. Cancel replaces the X while a game is live: it posts <code>Game cancelled by the host.</code> once and returns to the form.</p>
+	</section>
+
+	<section class="panel" aria-labelledby="p3">
+		<h2 id="p3">2b. In progress, rolling <small>Order with last rolls, status, turn timer.</small></h2>
+		<div class="win">
+			<div class="title"><svg><use href="#i-alliance" class="ic"/></svg><span>Death roll</span><button type="button" class="cancel">Cancel</button></div>
+			<div class="body">
+				<div class="sub">Raid chat, 1g per person, first roll 1-1000</div>
+				<ul class="list" id="order">
+					<li><span class="n">1.</span><span class="name">Alice</span><span class="v">734</span></li>
+					<li id="o-bob" class="cur"><span class="n">2.</span><span class="name">Bob <span class="tag">up now</span></span><span class="v">1-734</span></li>
+					<li class="out"><span class="n">3.</span><span class="name">Carl</span><span class="v">out</span></li>
+					<li><span class="n">4.</span><span class="name">Dan</span><span class="v"></span></li>
+					<li id="o-eve"><span class="n">5.</span><span class="name">Eve <span class="tag">(you)</span></span><span class="v"></span></li>
+				</ul>
+				<div class="status" id="status" style="margin-top:auto">Bob is up: /roll 734</div>
+				<div class="bar"><i style="--w:69%"></i></div>
+			</div>
+			<div class="foot"><button type="button" class="btn" id="roll" disabled>Roll 1-734</button></div>
+			<div class="faction">Alliance</div>
+		</div>
+		<p>Each row shows that player's last roll, the current player's range, or "out". Roll is enabled only on your turn and runs <code>RandomRoll(1, 734)</code>. Tick the toolbar box to see your turn.</p>
+	</section>
+
+	<section class="panel" aria-labelledby="p4">
+		<h2 id="p4">3. Winner <small>Stays until Reset.</small></h2>
+		<div class="win">
+			<div class="title"><svg><use href="#i-alliance" class="ic"/></svg><span>Death roll</span><button type="button" class="close" aria-label="Close">×</button></div>
+			<div class="body">
+				<div class="sub">Raid chat, 1g per person, first roll 1-1000</div>
+				<div class="winner"><span class="l">Winner</span><span class="name">Alice</span></div>
+				<ul class="list">
+					<li><span class="name">Bob owes Alice</span><span class="m">1g</span></li>
+					<li><span class="name">Carl owes Alice</span><span class="m">1g</span></li>
+					<li><span class="name">Dan owes Alice</span><span class="m">1g</span></li>
+					<li><span class="name">Eve owes Alice <span class="tag">(you)</span></span><span class="m">1g</span></li>
+					<li class="total"><span class="name">Total</span><span class="m">4g</span></li>
+				</ul>
+			</div>
+			<div class="foot"><button type="button" class="btn">Reset</button></div>
+			<div class="faction">Alliance</div>
+		</div>
+		<p>Reset returns to the form with Raid, 1g and 1000 still filled in. A cancelled game goes straight back to the form.</p>
+	</section>
+
+</div>
+
+<script>
+(function () {
+	var root = document.documentElement;
+	var segs = document.querySelectorAll('.seg button');
+	var names = { alliance: 'Alliance', horde: 'Horde' };
+	segs.forEach(function (b) {
+		b.addEventListener('click', function () {
+			var f = b.getAttribute('data-faction');
+			root.setAttribute('data-faction', f);
+			segs.forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+			document.querySelectorAll('.ic').forEach(function (u) { u.setAttribute('href', '#i-' + f); });
+			document.querySelectorAll('.faction').forEach(function (e) { e.textContent = names[f]; });
+		});
+	});
+	var turn = document.getElementById('my-turn');
+	var roll = document.getElementById('roll');
+	var status = document.getElementById('status');
+	var bob = document.getElementById('o-bob');
+	var eve = document.getElementById('o-eve');
+	function draw() {
+		var mine = turn.checked;
+		roll.disabled = !mine;
+		bob.classList.toggle('cur', !mine);
+		eve.classList.toggle('cur', mine);
+		bob.querySelector('.tag').textContent = mine ? '' : 'up now';
+		bob.querySelector('.v').textContent = mine ? '734' : '1-734';
+		eve.querySelector('.tag').textContent = mine ? '(you) up now' : '(you)';
+		eve.querySelector('.v').textContent = mine ? '1-734' : '';
+		status.textContent = mine ? 'You are up: /roll 734' : 'Bob is up: /roll 734';
+	}
+	turn.addEventListener('change', draw);
+	draw();
+})();
+</script>
+</body>
+</html>

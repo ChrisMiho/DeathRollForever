@@ -44,7 +44,7 @@ Non-goals
 | Version | Adds | Spec |
 |---------|------|------|
 | v1 | Host runs a whole game from chat: `/dr g 1g`, join by typing `1`, countdowns, shuffled order, calls that say what to type, 45 s turns with reminders and forfeit, winner line with who owes what | [docs/prd/functional.md](docs/prd/functional.md) |
-| v2 | The window: new game form, lobby, game and result views, settings view, faction tint | not yet written; notes in section 5 |
+| v2 | The host's window: form, lobby, rolling and winner states, Roll and Cancel buttons, `/dr show`, faction tint | [docs/prd/visual.md](docs/prd/visual.md) |
 | v3 | Sync: addon players see the window live, ROLL button, auto-roll if the client allows it | not yet written; notes in section 5 |
 | v4 | Ledger and trade detection: debts marked paid, `/dr owed`, paid notices in chat | not yet written; notes in section 5 |
 | v5 | Settings, saved variables, history and stats, host resumes after `/reload` | not yet written; notes in section 5 |
@@ -58,6 +58,12 @@ These are intent, kept here until each version gets its feature documents.
 They are not contracts.
 
 ### The window (v2)
+
+The v2 spec is [docs/prd/visual.md](docs/prd/visual.md). It builds the
+host's window with the form, lobby, rolling and winner states, Roll and
+Cancel, `/dr show` and the faction tint, movable and resizable. The rest of
+this note (remembering position, auto-open, settings, Join and Kick, the
+ledger ticks, crests per name) moves to v3 to v5.
 
 Movable, remembers its position, opens itself when a game is announced in a
 chat you are in. One window, five views: new game, lobby, game, result,
