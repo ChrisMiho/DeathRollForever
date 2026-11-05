@@ -13,3 +13,4 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Chat parsing: join words, `/roll` results (names with spaces included) and `/dr g|p|r <wager> [first roll]` arguments are recognised.
 - Game rules: lobby with join countdowns, shuffled turn order, turn reminders, forfeits on the turn timer, eliminations on a 1 and the winner's payout, as a pure state machine (no chat output yet).
 - Announcements: the exact `[DeathRoll]` chat line for every game event (kickoff, countdowns, roll order, calls, reminders, eliminations, winner and cancellations).
+- Host controller: `/dr g|p|r <wager> [first roll]` runs a game in guild, party or raid chat (join words and `/roll` results are read from chat, every announcement is posted), `/dr cancel` stops it and `/dr help` lists the commands.
