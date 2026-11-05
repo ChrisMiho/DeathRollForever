@@ -9,6 +9,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Window: `/dr show` opens a movable, resizable window with a faction-tinted title bar, an `×` (or `Cancel` while a game runs) in the corner, one main button and the faction name under it; it follows every game and cannot be hidden mid-game.
 - Form: with no game running the window shows `Chat` (Guild, Party, Raid), `Wager per person` and `First roll` with a `Start` button that does what `/dr g <wager> [first roll]` does; Enter in a box also starts, errors print to the chat frame and the values stay for the next game.
 - In progress: during the lobby the window shows the join countdown, a shrinking bar and who joined; during rolling the shuffled order with each player's last roll (`out` struck through for the eliminated), who is up and what to type, a turn bar, and a `Roll 1-<range>` button that is gray until your turn and then rolls the right range for you.
+- Winner: when a game ends the window shows `WINNER` with the name in the faction tint, one `X owes Y` row per loser with the wager (and `(you)` on your own debt) and a `Total` row, until `Reset` returns to the form with the values from before the game.
 
 ## [0.0.1] - 2026-11-05
 

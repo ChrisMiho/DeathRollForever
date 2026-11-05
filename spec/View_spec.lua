@@ -301,4 +301,67 @@ describe("View", function()
 			end)
 		end)
 	end)
+
+	-- 04-winner (package 09): Result.
+	describe("winner (04-winner)", function()
+		local finished
+
+		-- The finished fixture is built by hand as the document lists it:
+		-- raid, 1g, first roll 1000, five players, Alice won, host Eve.
+		before_each(function()
+			finished = {
+				host = "Eve",
+				channel = "RAID",
+				wager = 10000,
+				startRoll = 1000,
+				phase = "finished",
+				order = { "Alice", "Bob", "Carl", "Dan", "Eve" },
+				winner = "Alice",
+			}
+		end)
+
+		describe("Result", function()
+			it("AC-09-01 names the winner", function()
+				assert.are.equal("Alice", View.Result(finished, "Eve").winner)
+			end)
+
+			it("AC-09-02 one row per loser in order, (you) on the host, the wager as the amount", function()
+				assert.are.same({
+					{ text = "Bob owes Alice", you = false, amount = "1g" },
+					{ text = "Carl owes Alice", you = false, amount = "1g" },
+					{ text = "Dan owes Alice", you = false, amount = "1g" },
+					{ text = "Eve owes Alice", you = true, amount = "1g" },
+				}, View.Result(finished, "Eve").rows)
+			end)
+
+			it("AC-09-03 the total is the wager times the number of losers", function()
+				assert.are.equal("4g", View.Result(finished, "Eve").total)
+			end)
+
+			it("AC-09-04 two players show one row and a total with every part of the wager", function()
+				finished.order = { "Alice", "Bob" }
+				finished.winner = "Bob"
+				finished.wager = 15045
+				local model = View.Result(finished, "Eve")
+				assert.are.same({ { text = "Alice owes Bob", you = false, amount = "1g 50s 45c" } }, model.rows)
+				assert.are.equal("1g 50s 45c", model.total)
+			end)
+
+			it("AC-09-05 no row is (you) when the host won", function()
+				for _, row in ipairs(View.Result(finished, "Alice").rows) do
+					assert.is_false(row.you, row.text)
+				end
+			end)
+
+			it("AC-09-06 Result on a rolling game raises", function()
+				assert.has_error(function()
+					View.Result({ phase = "rolling" }, "Eve")
+				end)
+			end)
+
+			it("AC-09-07 the subtitle is View.Subtitle", function()
+				assert.are.equal("Raid chat, 1g per person, first roll 1-1000", View.Result(finished, "Eve").subtitle)
+			end)
+		end)
+	end)
 end)
