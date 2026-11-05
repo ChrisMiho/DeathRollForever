@@ -20,9 +20,17 @@ globals = {
 -- WoW API this addon reads. Add each new API here as it is used,
 -- so a typo in an API name fails lint instead of failing in game.
 read_globals = {
+	"Ambiguate",
 	"C_AddOns",
+	"C_Timer",
 	"CreateFrame",
+	"GetTime",
+	"IsInGroup",
+	"IsInGuild",
+	"IsInRaid",
 	"LibStub",
+	"SendChatMessage",
+	"UnitName",
 }
 
 files["spec/"] = {
