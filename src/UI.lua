@@ -111,13 +111,13 @@ local build = {
 	form = nil, -- 02-form (package 07): set below
 	lobby = nil, -- 03-in-progress (package 08): set below
 	rolling = nil, -- 03-in-progress (package 08): set below
-	winner = function() end, -- 04-winner (package 09)
+	winner = nil, -- 04-winner (package 09): set below
 }
 local draw = {
 	form = nil, -- 02-form (package 07): set below
 	lobby = nil, -- 03-in-progress (package 08): set below
 	rolling = nil, -- 03-in-progress (package 08): set below
-	winner = function() end, -- 04-winner (package 09)
+	winner = nil, -- 04-winner (package 09): set below
 }
 local onMain = {
 	form = nil, -- 02-form (package 07): set below
@@ -740,6 +740,107 @@ function onMain.rolling()
 	rolling.pending = rolling.game
 	setMainButton(rolling.label, false)
 	RandomRoll(1, rolling.range)
+end
+
+-- 04-winner (package 09): the result until Reset. The winner and who owes
+-- what; the main button reads Reset and 01 handles the click (onMain.winner
+-- above). Spec: docs/prd/visual/04-winner.md.
+
+-- Exact user-facing text of the winner state (04-winner.md). The debt rows,
+-- amounts and total come from View.Result.
+local WINNER_TEXT = {
+	label = "WINNER",
+	you = "(you)",
+	total = "Total",
+}
+
+-- Sizes the shell has no name for.
+local WINNER_LAYOUT = {
+	rowInset = 8, -- row text to the row's edges
+	tagGap = 6, -- debt text to its (you) tag
+	labelGap = 4, -- the WINNER label to the name under it
+}
+
+local winner = {} -- the winner's parts; filled by build.winner
+
+-- A debt row (04-winner.md): text at the left with (you) after it, the
+-- amount right-aligned, and a 1 px line along the top in the border colour
+-- that only the Total row shows. Rows are created by box:Layout on the first
+-- draw that needs them and reused, so every draw sets every field.
+local function newDebtRow(parent)
+	local row = CreateFrame("Frame", nil, parent)
+	local inset = WINNER_LAYOUT.rowInset
+	row.text = newText(row, GameFontHighlight, PALETTE.text)
+	row.text:SetPoint("LEFT", row, "LEFT", inset, 0)
+	row.you = newText(row, GameFontHighlight, PALETTE.muted)
+	row.you:SetText(WINNER_TEXT.you)
+	row.you:SetPoint("LEFT", row.text, "RIGHT", WINNER_LAYOUT.tagGap, 0)
+	row.you:Hide()
+	row.amount = newText(row, GameFontHighlight, PALETTE.text)
+	row.amount:SetPoint("RIGHT", row, "RIGHT", -inset, 0)
+	row.amount:SetJustifyH("RIGHT")
+	row.line = colourTexture(row, "ARTWORK", PALETTE.border)
+	row.line:SetHeight(1)
+	row.line:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+	row.line:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, 0)
+	row.line:Hide()
+	return row
+end
+
+-- Copies one debt of the view model into a row frame.
+local function paintDebt(row, model)
+	row.text:SetText(model.text)
+	row.text:SetTextColor(unpack(PALETTE.text))
+	if model.you then
+		row.you:Show()
+	else
+		row.you:Hide()
+	end
+	row.amount:SetText(model.amount)
+	row.line:Hide()
+end
+
+-- The last row: Total in muted, the total at the right, the line above.
+local function paintTotal(row, total)
+	row.text:SetText(WINNER_TEXT.total)
+	row.text:SetTextColor(unpack(PALETTE.muted))
+	row.you:Hide()
+	row.amount:SetText(total)
+	row.line:Show()
+end
+
+function build.winner(parent)
+	local gap = LAYOUT.gap
+
+	-- 1. Subtitle.
+	winner.subtitle = newSubtitle(parent)
+
+	-- 2. The WINNER label, muted and small, with the winner's name under it
+	-- in the big font and tint text.
+	local label = newText(parent, GameFontDisable, PALETTE.muted)
+	label:SetText(WINNER_TEXT.label)
+	label:SetPoint("TOPLEFT", winner.subtitle, "BOTTOMLEFT", 0, -gap)
+	winner.name = newText(parent, GameFontNormalHuge, shell.tint.text)
+	winner.name:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -WINNER_LAYOUT.labelGap)
+	winner.name:SetPoint("RIGHT", parent, "RIGHT", 0, 0)
+	winner.name:SetJustifyH("LEFT")
+
+	-- 3. The list box, filling the room down to the main button.
+	winner.list = newListBox(parent)
+	winner.list.frame:SetPoint("TOPLEFT", winner.name, "BOTTOMLEFT", 0, -gap)
+	winner.list.frame:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
+end
+
+-- The debts, then the Total as the last row of the same list.
+function draw.winner(g)
+	local model = ns.View.Result(g, shell.host)
+	winner.subtitle:SetText(model.subtitle)
+	winner.name:SetText(model.winner)
+	local rows = winner.list:Layout(#model.rows + 1, newDebtRow)
+	for i, debt in ipairs(model.rows) do
+		paintDebt(rows[i], debt)
+	end
+	paintTotal(rows[#model.rows + 1], model.total)
 end
 
 -- Builds the window once. Needs UnitFactionGroup and UnitName, so it runs on

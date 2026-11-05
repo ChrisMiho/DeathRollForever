@@ -26,6 +26,7 @@ read_globals = {
 	"CreateFrame",
 	"GameFontDisable",
 	"GameFontHighlight",
+	"GameFontNormalHuge",
 	"GameFontNormalLarge",
 	"GetTime",
 	"IsInGroup",

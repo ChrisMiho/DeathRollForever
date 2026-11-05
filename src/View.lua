@@ -177,3 +177,26 @@ function View.Game(game, host, now)
 end
 
 -- 04-winner (package 09): Result.
+
+-- Exact user-facing text of the winner state (04-winner.md).
+local DEBT_TEXT = "%s owes %s"
+
+-- The result: the winner and who owes what. One row per name in the order
+-- that is not the winner; the host's row is marked (you).
+function View.Result(game, host)
+	checkPhase(game, "finished", "Result")
+	local winner = game.winner
+	local amount = ns.Money.Format(game.wager)
+	local rows = {}
+	for _, name in ipairs(game.order) do
+		if name ~= winner then
+			rows[#rows + 1] = { text = DEBT_TEXT:format(name, winner), you = (name == host), amount = amount }
+		end
+	end
+	return {
+		subtitle = View.Subtitle(game),
+		winner = winner,
+		rows = rows,
+		total = ns.Money.Format(game.wager * #rows),
+	}
+end
