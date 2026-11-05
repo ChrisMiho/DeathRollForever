@@ -108,6 +108,11 @@ describe("Chat", function()
 				{ type = "out", name = "Carl", left = 4 })
 		end)
 
+		it("AC-04-11b out with one left drops the range sentence", function()
+			assertLine("Carl rolled 1 and is OUT! 1 left.",
+				{ type = "out", name = "Carl", left = 1 })
+		end)
+
 		it("AC-04-12 winner with several losers uses the plural form and the total", function()
 			assertLine("WINNER: Eve! Alice, Bob, Carl, Dan each owe Eve 1g (4g total).",
 				{ type = "winner", name = "Eve", losers = { "Alice", "Bob", "Carl", "Dan" },

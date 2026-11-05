@@ -68,7 +68,11 @@ function renderers.forfeit(event)
 end
 
 function renderers.out(event)
-	return string.format("%s rolled 1 and is OUT! %d left. Range resets.", event.name, event.left)
+	local line = string.format("%s rolled 1 and is OUT! %d left.", event.name, event.left)
+	if event.left > 1 then
+		line = line .. " Range resets."
+	end
+	return line
 end
 
 function renderers.winner(event)

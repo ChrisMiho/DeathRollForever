@@ -1,6 +1,6 @@
 # 04 Announcements: the exact chat text
 
-Status: draft v1. Owns `src/Chat.lua`, `spec/Chat_spec.lua`.
+Status: v1 implemented. Last verified against code: 2026-11-05. Owns `src/Chat.lua`, `spec/Chat_spec.lua`.
 
 ## Purpose and scope
 
@@ -46,6 +46,7 @@ Every line starts with `[DeathRoll] `. Examples use wager 1g, first roll 1000.
 | `reminder` | `Carl, 10 seconds! Type /roll 1000` |
 | `forfeit` | `Carl did not roll in time and is OUT. 4 left.` |
 | `out` | `Carl rolled 1 and is OUT! 4 left. Range resets.` |
+| `out`, one left | `Carl rolled 1 and is OUT! 1 left.` |
 | `winner` | `WINNER: Eve! Alice, Bob, Carl, Dan each owe Eve 1g (4g total).` |
 | `winner`, one loser | `WINNER: Eve! Alice owes Eve 1g.` |
 | `cancelled`, reason `host` | `Game cancelled by the host.` |
@@ -54,8 +55,9 @@ Every line starts with `[DeathRoll] `. Examples use wager 1g, first roll 1000.
 The kickoff line reads `game.wager`, `game.startRoll`, `game.joinWord`,
 `game.joinTime`, `game.turnTimer`. The `winner` line uses `event.losers` in
 elimination order, `event.wager` and `event.total`; with exactly one loser it
-uses the singular form and no total. `out` always says "Range resets."
-because the engine always resets on a 1. The "need 2" number is
+uses the singular form and no total. `out` says "Range resets." when more
+than one player is left; with one left the game is over, so the sentence is
+dropped and the winner line follows. The "need 2" number is
 `Rules.MIN_PLAYERS`.
 
 ## Interfaces
@@ -89,6 +91,7 @@ joinTime 60, turnTimer 45.
 | AC-04-09 | `reminder{name="Carl", secondsLeft=10, range=734}` | `Carl, 10 seconds! Type /roll 734` |
 | AC-04-10 | `forfeit{name="Carl", left=4}` | `Carl did not roll in time and is OUT. 4 left.` |
 | AC-04-11 | `out{name="Carl", left=4}` | `Carl rolled 1 and is OUT! 4 left. Range resets.` |
+| AC-04-11b | `out{name="Carl", left=1}` | `Carl rolled 1 and is OUT! 1 left.` |
 | AC-04-12 | `winner{name="Eve", losers={"Alice","Bob","Carl","Dan"}, wager=10000, total=40000}` | `WINNER: Eve! Alice, Bob, Carl, Dan each owe Eve 1g (4g total).` |
 | AC-04-13 | `winner{name="Eve", losers={"Alice"}, wager=5000, total=5000}` | `WINNER: Eve! Alice owes Eve 50s.` |
 | AC-04-14 | `cancelled{reason="host"}` | `Game cancelled by the host.` |
