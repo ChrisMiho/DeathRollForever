@@ -89,8 +89,10 @@ Every `draw.rolling` sets the main button's label to `button.label` and
 enables it only when `button.enabled`.
 
 `onMain.rolling()`: `RandomRoll(1, range)` with the `range` from the last
-draw `[P0-CLICKROLL]`, then disable the main button until the next draw
-enables it again. A second click before the roll result arrives does
+draw `[P0-CLICKROLL]`, then disable the main button and keep it disabled,
+whatever later draws say, until a draw finds the host is no longer the
+current player (the roll result arrived, or the turn timer forfeited the
+host) or a new game. A second click before the roll result arrives does
 nothing.
 
 Lists reuse row frames: build as many rows as needed on the first draw,

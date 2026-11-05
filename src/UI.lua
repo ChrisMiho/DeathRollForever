@@ -109,20 +109,20 @@ local shown -- the state currently drawn, or nil before the first redraw
 -- draw[state](game, now) on every redraw, onMain[state]() on a main button click.
 local build = {
 	form = nil, -- 02-form (package 07): set below
-	lobby = function() end, -- 03-in-progress (package 08)
-	rolling = function() end, -- 03-in-progress (package 08)
+	lobby = nil, -- 03-in-progress (package 08): set below
+	rolling = nil, -- 03-in-progress (package 08): set below
 	winner = function() end, -- 04-winner (package 09)
 }
 local draw = {
 	form = nil, -- 02-form (package 07): set below
-	lobby = function() end, -- 03-in-progress (package 08)
-	rolling = function() end, -- 03-in-progress (package 08)
+	lobby = nil, -- 03-in-progress (package 08): set below
+	rolling = nil, -- 03-in-progress (package 08): set below
 	winner = function() end, -- 04-winner (package 09)
 }
 local onMain = {
 	form = nil, -- 02-form (package 07): set below
 	lobby = function() end, -- nothing: the button is gray
-	rolling = function() end, -- 03-in-progress (package 08)
+	rolling = nil, -- 03-in-progress (package 08): set below
 	winner = nil, -- set below: forget the game and redraw
 }
 
@@ -206,9 +206,8 @@ local function setCorner(live)
 end
 
 -- List box (visual.md 4.4): used by 03 and 04. See the file comment.
--- The inline ignore goes away when package 08 adds the first caller.
 
-local function newListBox(parent) -- luacheck: ignore 211
+local function newListBox(parent)
 	local frame = CreateFrame("Frame", nil, parent, "BackdropTemplate")
 	frame:SetBackdrop(BACKDROP)
 	frame:SetBackdropColor(unpack(PALETTE.box))
@@ -463,6 +462,284 @@ function onMain.form()
 	if not ok then
 		ns.Print(startError)
 	end
+end
+
+-- 03-in-progress (package 08): the lobby and the rolling game. The countdown,
+-- the join bar and who joined; then the order with each player's last roll,
+-- who is up, the turn bar and the Roll button. Spec:
+-- docs/prd/visual/03-in-progress.md.
+
+-- Exact user-facing text of the lobby and rolling states (03-in-progress.md).
+-- The status lines, values and button label come from View.Lobby / View.Game.
+local PROGRESS_TEXT = {
+	secondsLeft = "SECONDS LEFT TO JOIN",
+	joined = "Joined",
+	you = "(you)",
+	upNow = "up now",
+	number = "%d.",
+}
+
+-- Sizes the shell has no name for.
+local PROGRESS_LAYOUT = {
+	rowInset = 8, -- row text to the row's edges
+	numberWidth = 24, -- the row number column
+	tagGap = 6, -- name to its tag, tag to the next tag
+	labelGap = 4, -- countdown number to its label; status line to the bar
+	upNowAlpha = 0.85, -- the up now tag on the tinted row
+}
+
+local lobby = {} -- the lobby's parts; filled by build.lobby
+local rolling = {} -- the rolling parts, the last drawn game and range; filled by build.rolling
+
+-- A FontString in a font object and colour.
+local function newText(parent, fontObject, colour)
+	local text = parent:CreateFontString(nil, "OVERLAY")
+	text:SetFontObject(fontObject)
+	text:SetTextColor(unpack(colour))
+	return text
+end
+
+-- A progress bar (visual.md 4.4): 6 px high, track in box, fill in tint
+-- button, no text. Its value is the view model's fraction, 0..1.
+local function newProgressBar(parent)
+	local bar = CreateFrame("StatusBar", nil, parent)
+	bar:SetHeight(LAYOUT.barHeight)
+	colourTexture(bar, "BACKGROUND", PALETTE.box):SetAllPoints()
+	bar:SetStatusBarTexture(WHITE8X8)
+	bar:SetStatusBarColor(unpack(shell.tint.button))
+	bar:SetMinMaxValues(0, 1)
+	bar:SetValue(0)
+	return bar
+end
+
+-- "|cffrrggbb" for a { r, g, b } colour.
+local function colourCode(colour)
+	return ("|cff%02x%02x%02x"):format(
+		math.floor(colour[1] * 255 + 0.5),
+		math.floor(colour[2] * 255 + 0.5),
+		math.floor(colour[3] * 255 + 0.5)
+	)
+end
+
+-- The lobby status with its join word (the one between spaces) wrapped in
+-- the tint's colour code.
+local function highlightWord(text, word, colour)
+	local s, e = text:find(" " .. word .. " ", 1, true)
+	if not s then
+		return text
+	end
+	return text:sub(1, s) .. colourCode(colour) .. word .. "|r" .. text:sub(e)
+end
+
+-- A list row (visual.md 4.4): number, name, `up now`, `(you)` and a
+-- right-aligned value over a background shown on the current row, with the
+-- strike line of visual.md 4.3 across the name, shown on an out row. Rows
+-- are created by box:Layout on the first draw that needs them and reused.
+local function newRow(parent)
+	local row = CreateFrame("Frame", nil, parent)
+	local inset = PROGRESS_LAYOUT.rowInset
+	row.bg = colourTexture(row, "BACKGROUND", shell.tint.title)
+	row.bg:SetAllPoints()
+	row.bg:Hide()
+
+	row.number = newText(row, GameFontHighlight, PALETTE.muted)
+	row.number:SetPoint("LEFT", row, "LEFT", inset, 0)
+	row.number:SetWidth(PROGRESS_LAYOUT.numberWidth)
+	row.number:SetJustifyH("LEFT")
+	row.name = newText(row, GameFontHighlight, PALETTE.text)
+	row.name:SetPoint("LEFT", row.number, "RIGHT", 0, 0)
+	row.upNow = newText(row, GameFontHighlight, PALETTE.muted)
+	row.upNow:SetText(PROGRESS_TEXT.upNow)
+	row.upNow:SetPoint("LEFT", row.name, "RIGHT", PROGRESS_LAYOUT.tagGap, 0)
+	row.upNow:Hide()
+	row.you = newText(row, GameFontHighlight, PALETTE.muted)
+	row.you:SetText(PROGRESS_TEXT.you)
+	row.you:SetPoint("LEFT", row.name, "RIGHT", PROGRESS_LAYOUT.tagGap, 0)
+	row.you:Hide()
+	row.value = newText(row, GameFontHighlight, PALETTE.muted)
+	row.value:SetPoint("RIGHT", row, "RIGHT", -inset, 0)
+	row.value:SetJustifyH("RIGHT")
+
+	-- The strike line sits in a frame one level up so it draws over the name.
+	local over = CreateFrame("Frame", nil, row)
+	over:SetAllPoints()
+	over:SetFrameLevel(row:GetFrameLevel() + 1)
+	row.strike = colourTexture(over, "OVERLAY", PALETTE.disabled)
+	row.strike:SetHeight(1)
+	row.strike:SetPoint("LEFT", row.name, "LEFT", 0, 0)
+	row.strike:SetPoint("RIGHT", row.name, "RIGHT", 0, 0)
+	row.strike:Hide()
+	return row
+end
+
+-- Copies one view model row into a row frame. Lobby rows have no current,
+-- out or value; they draw as plain rows.
+local function paintRow(row, model)
+	row.number:SetText(PROGRESS_TEXT.number:format(model.n))
+	row.name:SetText(model.name)
+	row.value:SetText(model.value or "")
+
+	row.you:ClearAllPoints()
+	if model.current then
+		row.upNow:Show()
+		row.you:SetPoint("LEFT", row.upNow, "RIGHT", PROGRESS_LAYOUT.tagGap, 0)
+	else
+		row.upNow:Hide()
+		row.you:SetPoint("LEFT", row.name, "RIGHT", PROGRESS_LAYOUT.tagGap, 0)
+	end
+	if model.you then
+		row.you:Show()
+	else
+		row.you:Hide()
+	end
+
+	if model.current then
+		local white = PALETTE.text
+		row.bg:Show()
+		row.number:SetTextColor(unpack(white))
+		row.name:SetTextColor(unpack(white))
+		row.upNow:SetTextColor(white[1], white[2], white[3], PROGRESS_LAYOUT.upNowAlpha)
+		row.you:SetTextColor(unpack(white))
+		row.value:SetTextColor(unpack(white))
+	elseif model.out then
+		row.bg:Hide()
+		row.number:SetTextColor(unpack(PALETTE.muted))
+		row.name:SetTextColor(unpack(PALETTE.disabled))
+		row.you:SetTextColor(unpack(PALETTE.muted))
+		row.value:SetTextColor(unpack(PALETTE.disabled))
+	else
+		row.bg:Hide()
+		row.number:SetTextColor(unpack(PALETTE.muted))
+		row.name:SetTextColor(unpack(PALETTE.text))
+		row.you:SetTextColor(unpack(PALETTE.muted))
+		row.value:SetTextColor(unpack(PALETTE.muted))
+	end
+	if model.out then
+		row.strike:Show()
+	else
+		row.strike:Hide()
+	end
+end
+
+-- A subtitle in the hint font, muted, across the top of a content frame.
+local function newSubtitle(parent)
+	local subtitle = newText(parent, GameFontDisable, PALETTE.muted)
+	subtitle:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, 0)
+	subtitle:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, 0)
+	subtitle:SetJustifyH("LEFT")
+	return subtitle
+end
+
+function build.lobby(parent)
+	local gap = LAYOUT.gap
+
+	-- 1. Subtitle.
+	lobby.subtitle = newSubtitle(parent)
+
+	-- 2. The countdown number and its label, centred.
+	lobby.countdown = newText(parent, NumberFontNormalHuge, shell.tint.text)
+	lobby.countdown:SetPoint("TOP", lobby.subtitle, "BOTTOM", 0, -gap)
+	local label = newText(parent, GameFontDisable, PALETTE.muted)
+	label:SetText(PROGRESS_TEXT.secondsLeft)
+	label:SetPoint("TOP", lobby.countdown, "BOTTOM", 0, -PROGRESS_LAYOUT.labelGap)
+
+	-- 3. The join bar.
+	lobby.bar = newProgressBar(parent)
+	lobby.bar:SetPoint("TOP", label, "BOTTOM", 0, -gap)
+	lobby.bar:SetPoint("LEFT", parent, "LEFT", 0, 0)
+	lobby.bar:SetPoint("RIGHT", parent, "RIGHT", 0, 0)
+
+	-- 4. The header row: Joined at the left, the count at the right.
+	local header = newText(parent, GameFontHighlight, PALETTE.muted)
+	header:SetText(PROGRESS_TEXT.joined)
+	header:SetPoint("TOPLEFT", lobby.bar, "BOTTOMLEFT", 0, -gap)
+	lobby.count = newText(parent, GameFontHighlight, PALETTE.muted)
+	lobby.count:SetPoint("TOPRIGHT", lobby.bar, "BOTTOMRIGHT", 0, -gap)
+	lobby.count:SetJustifyH("RIGHT")
+
+	-- 6. The status line, anchored above the main button, with the join word
+	-- in tint text (one string, the word wrapped in the colour code).
+	lobby.status = newText(parent, GameFontHighlight, PALETTE.text)
+	lobby.status:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 0, 0)
+	lobby.status:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
+	lobby.status:SetJustifyH("LEFT")
+
+	-- 5. The list box, filling the room down to the status line.
+	lobby.list = newListBox(parent)
+	lobby.list.frame:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -gap)
+	lobby.list.frame:SetPoint("RIGHT", parent, "RIGHT", 0, 0)
+	lobby.list.frame:SetPoint("BOTTOMLEFT", lobby.status, "TOPLEFT", 0, gap)
+end
+
+function draw.lobby(g, now)
+	local model = ns.View.Lobby(g, shell.host, now)
+	lobby.subtitle:SetText(model.subtitle)
+	lobby.countdown:SetText(model.secondsLeft)
+	lobby.bar:SetValue(model.fraction)
+	lobby.count:SetText(model.count)
+	lobby.status:SetText(highlightWord(model.status, g.joinWord, shell.tint.text))
+	local rows = lobby.list:Layout(#model.rows, newRow)
+	for i, row in ipairs(model.rows) do
+		paintRow(rows[i], row)
+	end
+end
+
+function build.rolling(parent)
+	local gap = LAYOUT.gap
+
+	-- 1. Subtitle.
+	rolling.subtitle = newSubtitle(parent)
+
+	-- 4. The turn bar, at the bottom.
+	rolling.bar = newProgressBar(parent)
+	rolling.bar:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 0, 0)
+	rolling.bar:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
+
+	-- 3. The status line, in tint text, directly over the bar.
+	rolling.status = newText(parent, GameFontHighlight, shell.tint.text)
+	rolling.status:SetPoint("BOTTOMLEFT", rolling.bar, "TOPLEFT", 0, PROGRESS_LAYOUT.labelGap)
+	rolling.status:SetPoint("BOTTOMRIGHT", rolling.bar, "TOPRIGHT", 0, PROGRESS_LAYOUT.labelGap)
+	rolling.status:SetJustifyH("LEFT")
+
+	-- 2. The list box, filling the room down to the status line.
+	rolling.list = newListBox(parent)
+	rolling.list.frame:SetPoint("TOPLEFT", rolling.subtitle, "BOTTOMLEFT", 0, -gap)
+	rolling.list.frame:SetPoint("BOTTOMRIGHT", rolling.status, "TOPRIGHT", 0, gap)
+end
+
+-- Every redraw sets the main button from button.label and button.enabled.
+-- After a click on Roll the button stays gray until that roll has arrived:
+-- rolling.pending is the game the click was for, and clears on the first
+-- draw where the host is no longer up (or the game has changed).
+function draw.rolling(g, now)
+	local model = ns.View.Game(g, shell.host, now)
+	rolling.subtitle:SetText(model.subtitle)
+	rolling.status:SetText(model.status)
+	rolling.bar:SetValue(model.fraction)
+	local rows = rolling.list:Layout(#model.rows, newRow)
+	for i, row in ipairs(model.rows) do
+		paintRow(rows[i], row)
+	end
+
+	if not model.button.enabled or rolling.pending ~= g then
+		rolling.pending = nil
+	end
+	rolling.game = g
+	rolling.label = model.button.label
+	rolling.range = model.button.range
+	setMainButton(model.button.label, model.button.enabled and not rolling.pending)
+end
+
+-- Roll: RandomRoll(1, range) with the range from the last draw
+-- [P0-CLICKROLL]; the button is gray until the roll result arrives, so a
+-- second click before then does nothing.
+function onMain.rolling()
+	if rolling.pending then
+		return
+	end
+	rolling.pending = rolling.game
+	setMainButton(rolling.label, false)
+	RandomRoll(1, rolling.range)
 end
 
 -- Builds the window once. Needs UnitFactionGroup and UnitName, so it runs on
