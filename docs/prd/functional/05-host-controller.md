@@ -60,9 +60,10 @@ the game.
   Ambiguate(sender, "short")`. If `Parse.JoinWord(text, game.joinWord)`:
   post `Rules.Join(game, name, GetTime())`.
 - `CHAT_MSG_SYSTEM (text)`: only while hosting. `name, roll, min, max =
-  Parse.Roll(text)`; if nil, ignore. `[P0-ROLL]` If `name == "You"`, use the
-  host's name. `name = Ambiguate(name, "short")`. Post `Rules.Roll(game, name,
-  roll, min, max, GetTime())`.
+  Parse.Roll(text)`; if nil, ignore. `[P0-ROLL]` answered 2026-11-05: the
+  host's own roll shows with the host's name like everyone else's, never as
+  "You", so no mapping is needed. `name = Ambiguate(name, "short")`. Post
+  `Rules.Roll(game, name, roll, min, max, GetTime())`.
 
 ### Tick
 
@@ -140,7 +141,7 @@ party with two alts on second accounts. Note what you see against each line.
 | IG-05-10 | someone not called types `/roll 1000` | nothing posted |
 | IG-05-11 | the called player types `/roll 500` | `..., wrong range. Type /roll 1000` |
 | IG-05-12 | the called player types `/roll 1000` | the next call with `Type /roll <their result>` `[P0-ROLL]` |
-| IG-05-13 | you, as host, are called and roll | your own roll counts `[P0-ROLL]` (checks "You roll" handling) |
+| IG-05-13 | you, as host, are called and roll | your own roll counts `[P0-ROLL]` (the host's line uses the host's name, not "You") |
 | IG-05-14 | the called player waits | reminders at 20, 10, 5, then `... did not roll in time and is OUT. 2 left.` and the next call with the same range |
 | IG-05-15 | play until someone rolls 1 | `... rolled 1 and is OUT! ... Range resets.` then a call with `/roll 1000` |
 | IG-05-16 | play to the end | `WINNER: ...! ... each owe ... 1g (2g total).` and no further lines; `/dr g 1g` starts a new game |
