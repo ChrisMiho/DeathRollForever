@@ -9,3 +9,4 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Project setup: packaging, libraries from Ace3, lint, unit tests and CI.
 - Hello build: the addon loads, checks its libraries and answers `/dr`.
 - Build script: one command makes a shareable zip and installs into the game.
+- Wager amounts: `5`, `1.5g`, `1g 50s 45c` and the like are read as copper and shown back as `1g 50s 45c`.
