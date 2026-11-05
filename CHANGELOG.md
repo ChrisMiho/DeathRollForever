@@ -10,3 +10,4 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Hello build: the addon loads, checks its libraries and answers `/dr`.
 - Build script: one command makes a shareable zip and installs into the game.
 - Wager amounts: `5`, `1.5g`, `1g 50s 45c` and the like are read as copper and shown back as `1g 50s 45c`.
+- Game rules: lobby with join countdowns, shuffled turn order, turn reminders, forfeits on the turn timer, eliminations on a 1 and the winner's payout, as a pure state machine (no chat output yet).
