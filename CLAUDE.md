@@ -23,7 +23,9 @@ Run from the repo root. On Windows, `.sh` scripts need Git Bash.
 | Build and zip only (no game install) | `scripts/build.sh --no-install` |
 
 Lint and tests must pass before you call work done; CI runs both on every push.
-The build output goes to `.release/` (git-ignored).
+The build output goes to `.release/` (git-ignored). `scripts/build.sh` only
+works in a normal checkout: inside a git worktree the packager stops with
+"No Git, SVN, or Hg checkout found", so build from `main` after merging.
 
 ## Layout
 
