@@ -24,12 +24,17 @@ read_globals = {
 	"C_AddOns",
 	"C_Timer",
 	"CreateFrame",
+	"GameFontDisable",
+	"GameFontHighlight",
+	"GameFontNormalLarge",
 	"GetTime",
 	"IsInGroup",
 	"IsInGuild",
 	"IsInRaid",
 	"LibStub",
 	"SendChatMessage",
+	"UIParent",
+	"UnitFactionGroup",
 	"UnitName",
 }
 

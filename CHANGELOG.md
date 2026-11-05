@@ -5,6 +5,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Window: `/dr show` opens a movable, resizable window with a faction-tinted title bar, an `×` (or `Cancel` while a game runs) in the corner, one main button and the faction name under it; it follows every game and cannot be hidden mid-game.
+
 ## [0.0.1] - 2026-11-05
 
 First playable release. Only the host needs the addon; everyone else plays by
