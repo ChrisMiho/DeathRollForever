@@ -5,6 +5,8 @@ codes = true
 exclude_files = {
 	"Libs/",
 	".release/",
+	".lua/",      -- Lua installed by CI (leafo/gh-actions-lua)
+	".luarocks/", -- LuaRocks installed by CI (leafo/gh-actions-luarocks)
 	".luacheckrc",
 }
 

@@ -9,6 +9,10 @@
 *.zip
 luacov.*.out
 
+# Lua toolchains installed into the workspace by CI
+/.lua/
+/.luarocks/
+
 # Local tooling state
 /.superpowers/
 .DS_Store
