@@ -1,6 +1,6 @@
 # Functional PRD
 
-Status: draft v1. The product overview is [PRD.md](../../PRD.md); this
+Status: v1 implemented. Last verified against code: 2026-11-05. The product overview is [PRD.md](../../PRD.md); this
 document is the behaviour. Each feature's detail, text and acceptance
 criteria is in a sub-document under [functional/](functional/).
 

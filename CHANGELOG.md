@@ -5,6 +5,17 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.0.1] - 2026-11-05
+
+First playable release. Only the host needs the addon; everyone else plays by
+typing in chat and using `/roll`. Type `/dr g 1g` (or `/dr p`, `/dr r`) to run
+a death roll in guild, party or raid chat: players type `1` to join during a
+60-second lobby with countdowns, the addon shuffles the order, calls each
+player in turn with the range to roll, reminds them, forfeits anyone who
+waits too long, knocks out whoever rolls 1, and names the winner with who
+owes what. `/dr cancel` stops a game, `/dr help` lists the commands. In a
+guild game, group the players in a raid so rolls from far away are seen.
+
 ### Added
 - Project setup: packaging, libraries from Ace3, lint, unit tests and CI.
 - Hello build: the addon loads, checks its libraries and answers `/dr`.

@@ -4,7 +4,7 @@ The specs for DeathRollForever live in this folder. This page is the only one
 an agent loads by default. Find the document that owns what you are changing,
 load it and [contracts.md](contracts.md), and nothing else.
 
-Current version being built: **v1, the host runs a game from chat.**
+Current version: **v1, the host runs a game from chat**, released as v0.0.1.
 Labels: `v1` is in scope now. `out of scope for v1` marks documents and
 features that are planned but not written or built yet; the label comes off
 when that version starts.
@@ -59,7 +59,7 @@ Every change to behaviour, whether a feature or a bug fix, goes like this:
 
 | Version | Adds | Status |
 |---------|------|--------|
-| v1 | Host runs a whole game from chat. Kickoff, join by chat, countdowns, shuffled order, calls, turn timer, forfeits, winner line with who owes what | being specified |
+| v1 | Host runs a whole game from chat. Kickoff, join by chat, countdowns, shuffled order, calls, turn timer, forfeits, winner line with who owes what | implemented, v0.0.1 |
 | v2 | The window: new game form, lobby, game and result views, settings view, faction tint | out of scope for v1 |
 | v3 | Sync: addon players see the window live, ROLL button, auto-roll if allowed | out of scope for v1 |
 | v4 | Ledger and trade detection: debts marked paid, `/dr owed` | out of scope for v1 |

@@ -1,6 +1,6 @@
 # 03 Rules engine
 
-Status: draft v1. Owns `src/Rules.lua`, `spec/Rules_spec.lua`.
+Status: v1 implemented. Last verified against code: 2026-11-05. Owns `src/Rules.lua`, `spec/Rules_spec.lua`.
 
 ## Purpose and scope
 

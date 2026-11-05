@@ -1,6 +1,6 @@
 # DeathRollForever — Product overview
 
-Status: v1 being specified. The behaviour is in [docs/prd/](docs/prd/README.md);
+Status: v1 implemented and released as v0.0.1 on 2026-11-05. The behaviour is in [docs/prd/](docs/prd/README.md);
 this page is the intent and the roadmap. Anything written here and in a
 feature document lives in the feature document.
 

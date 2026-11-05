@@ -1,6 +1,6 @@
 # Contracts
 
-Status: draft v1. Last verified against code: never (no feature code exists yet).
+Status: v1 implemented. Last verified against code: 2026-11-05.
 
 Everything that parallel builders share. A builder reads this, their own
 feature document and `CLAUDE.md`, and nothing else. If a feature needs

@@ -1,6 +1,6 @@
 # 05 Host controller: slash commands, chat in, lines out, the ticker
 
-Status: draft v1. Owns `src/Host.lua`, `src/Init.lua`.
+Status: v1 implemented. Last verified against code: 2026-11-05. Owns `src/Host.lua`, `src/Init.lua`.
 
 ## Purpose and scope
 
@@ -123,6 +123,10 @@ Creates `src/Host.lua`. Edits `src/Init.lua` (replaces the hello handler) and
 None. `luacheck .` must pass, which catches any API name not declared.
 
 ### In-game (manual)
+
+Run on 2026-11-05 in a two-player party: IG-05-12, 13, 15 and 16 were seen in a full
+game played to the winner line, with two-word character names throughout; the
+host reported no failures in the rest.
 
 Run these in a guild where at least two other characters can type, or in a
 party with two alts on second accounts. Note what you see against each line.

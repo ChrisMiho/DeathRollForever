@@ -1,6 +1,6 @@
 # 01 Money: parsing and formatting wagers
 
-Status: draft v1. Owns `src/Money.lua`, `spec/Money_spec.lua`.
+Status: v1 implemented. Last verified against code: 2026-11-05. Owns `src/Money.lua`, `spec/Money_spec.lua`.
 
 ## Purpose and scope
 

@@ -1,6 +1,6 @@
 # Orchestration: building v1
 
-Status: draft v1. For the agent that runs the build. Sub-agents never read
+Status: v1 implemented. Last verified against code: 2026-11-05. For the agent that runs the build. Sub-agents never read
 this; they get a brief from section 4.
 
 ## 1. Rules for the orchestrator

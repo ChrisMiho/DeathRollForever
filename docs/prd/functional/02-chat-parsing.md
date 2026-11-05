@@ -1,6 +1,6 @@
 # 02 Chat parsing: join words, roll results, `/dr` arguments
 
-Status: draft v1. Owns `src/Parse.lua`, `spec/Parse_spec.lua`.
+Status: v1 implemented. Last verified against code: 2026-11-05. Owns `src/Parse.lua`, `spec/Parse_spec.lua`.
 
 ## Purpose and scope
 
