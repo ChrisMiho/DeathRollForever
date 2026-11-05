@@ -50,10 +50,10 @@ depending on them is built. 01 and 03 can start before Phase 0 is done.
 
 | Check | How | Result |
 |-------|-----|--------|
-| `[P0-ROLL]` | In any chat, type `/roll 1000`. Copy the system line exactly. Have another player roll; copy that line too | _pending_ |
-| `[P0-POST]` | With the hello build, run from chat: `/run SendChatMessage("test", "GUILD")`. Then `/run C_Timer.After(2, function() SendChatMessage("test2", "GUILD") end)`. Both must appear in guild chat. Repeat with `"PARTY"` in a party | _pending_ |
-| `[P0-DISTANCE]` | A guild member in another zone, not grouped with you, types `/roll 1000`. Do you see the system line? Then the same while grouped in a raid, far apart | _pending_ |
-| `[P0-AUTOROLL]` | `/run C_Timer.After(2, function() RandomRoll(1, 100) end)`. Does a roll happen, or an error about a protected function? Not needed for v1; record it for v3 | _pending_ |
+| `[P0-ROLL]` | In any chat, type `/roll 1000`. Copy the system line exactly. Have another player roll; copy that line too | 2026-11-05: `Badass Bull rolls 282 (1-1000)` and `Natus Vincere rolls 818 (1-1000)`. Own roll and other players' rolls use the same form; the game never says "You roll". Character names on this server can contain a space |
+| `[P0-POST]` | With the hello build, run from chat: `/run SendChatMessage("test", "GUILD")`. Then `/run C_Timer.After(2, function() SendChatMessage("test2", "GUILD") end)`. Both must appear in guild chat. Repeat with `"PARTY"` in a party | 2026-11-05 GUILD: works. Chat showed `[Guild] [Forgot Shards]: test` at once and `[Guild] [Forgot Shards]: test2` from the timer, no errors. PARTY: works. Chat showed `[Party] [Forgot Shards]: test` at once and `[Party] [Forgot Shards]: test2` from the timer, no errors. The party leader's own lines show as `[Party Leader] [Tohora Greytusk]: ...` |
+| `[P0-DISTANCE]` | A guild member in another zone, not grouped with you, types `/roll 1000`. Do you see the system line? Then the same while grouped in a raid, far apart | 2026-11-05: ungrouped guild member far away: roll line NOT seen. Grouped in a party far away: roll line seen. Raid not tested separately; IG-05-20 covers it in Phase 4. Consequence: 04's optional kickoff sentence is on, README recommends grouping for guild games |
+| `[P0-AUTOROLL]` | `/run C_Timer.After(2, function() RandomRoll(1, 100) end)`. Does a roll happen, or an error about a protected function? Not needed for v1; record it for v3 | 2026-11-05: works. `Forgot Shards rolls 99 (1-100)` appeared from the timer, no error. Auto-roll from addon code is possible on this server |
 
 If `[P0-POST]` fails there is no v1 as designed: stop and talk to the human.
 If `[P0-DISTANCE]` fails for ungrouped guild members, 04's optional kickoff

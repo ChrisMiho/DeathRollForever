@@ -16,8 +16,9 @@ Depends on: [contracts.md](../contracts.md) sections 5.4 and 6; 01-money for
 `Money.Format`; 03-rules-engine for event shapes.
 Blocks: 05-host-controller.
 
-`[P0-DISTANCE]`: if the Phase 0 check shows far-away guild members' rolls are
-not seen, the kickoff line gains the sentence in the table marked optional.
+`[P0-DISTANCE]`: answered 2026-11-05. Far-away guild members' rolls are not
+seen unless grouped, so the kickoff line includes the sentence in the table
+marked optional. It is always on in v1.
 
 ## Behaviour
 

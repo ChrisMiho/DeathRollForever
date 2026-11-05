@@ -6,6 +6,10 @@ plays by typing in chat and using `/roll`.
 
 Status: early development. See [PRD.md](PRD.md) for the full design.
 
+Guild games: the host only sees `/roll` results from players in the same area
+or in the same group. For a guild game, invite the players to a raid so rolls
+from anywhere are seen.
+
 ## Install (players)
 
 1. Download the latest `DeathRollForever-<version>.zip` from the

@@ -18,10 +18,10 @@ Decisions that depend on the four in-game checks are tagged in every document:
 
 | Tag | Check | What changes if the answer is bad |
 |-----|-------|-----------------------------------|
-| `[P0-ROLL]` | Exact text of the system message for `/roll`, for your own roll and for another player's | `Parse.ROLL_PATTERN`, and whether the host's own name appears as "You" |
-| `[P0-POST]` | Addon code can post to guild, party and raid chat, both from a slash command and from a timer | Blocking. No design fallback; the product needs this |
-| `[P0-DISTANCE]` | The host sees the roll system message from a guild member who is far away and not grouped | Kickoff line tells players to stay near the host, and the README recommends grouping for guild games |
-| `[P0-AUTOROLL]` | Addon code can call `RandomRoll` from a timer (no hardware event) | Nothing in v1. Decides whether v2+ can offer auto-roll |
+| `[P0-ROLL]` | Exact text of the system message for `/roll`, for your own roll and for another player's | `Parse.ROLL_PATTERN`, and whether the host's own name appears as "You". Answered: `Name rolls N (1-M)` for everyone, never "You"; character names on this server can contain a space, so the name capture is `(.-)`, not `(%S+)` |
+| `[P0-POST]` | Addon code can post to guild, party and raid chat, both from a slash command and from a timer | Blocking. No design fallback; the product needs this. Answered: works in guild and party, direct and from a timer |
+| `[P0-DISTANCE]` | The host sees the roll system message from a guild member who is far away and not grouped | Kickoff line tells players to stay near the host, and the README recommends grouping for guild games. Answered: not seen ungrouped, seen when grouped; the kickoff sentence is on |
+| `[P0-AUTOROLL]` | Addon code can call `RandomRoll` from a timer (no hardware event) | Nothing in v1. Decides whether v2+ can offer auto-roll. Answered: works |
 
 ## 1. Module map (v1)
 
@@ -185,7 +185,7 @@ and any amount outside `MIN..MAX`, returns `nil, Money.ERROR`.
 ### 5.2 `ns.Parse`
 
 ```lua
-Parse.ROLL_PATTERN    = "^(%S+) rolls (%d+) %((%d+)%-(%d+)%)$"   -- [P0-ROLL] draft
+Parse.ROLL_PATTERN    = "^(.-) rolls (%d+) %((%d+)%-(%d+)%)$"   -- [P0-ROLL] confirmed 2026-11-05; names may contain spaces
 Parse.JoinWord(message, joinWord) -> boolean
 Parse.Roll(systemMessage, pattern) -> name, roll, min, max | nil   -- pattern defaults to ROLL_PATTERN
 Parse.Command(text)   -> { name = "g", args = { "1g", "500" } }     -- never fails; "" gives name ""

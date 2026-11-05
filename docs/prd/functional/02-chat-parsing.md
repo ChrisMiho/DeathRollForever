@@ -18,11 +18,13 @@ Depends on: [contracts.md](../contracts.md) section 5.2; 01-money for
 `Money.Parse` inside `StartArgs`.
 Blocks: 05-host-controller.
 
-Phase 0: `ROLL_PATTERN` is a draft until `[P0-ROLL]` is answered. The builder
-uses the pattern in contracts.md and writes the tests against the message text
-the human pasted into orchestration.md Phase 0 results. If the human's own
-roll shows as `You roll 734 (1-1000)`, `Parse.Roll` must also match that form
-and return the name `"You"`; 05 then maps `"You"` to the host's name.
+Phase 0: `[P0-ROLL]` was answered on 2026-11-05. The game shows every roll,
+the host's own included, as `Name rolls 734 (1-1000)`; it never says "You".
+Character names on this server can contain a space (`Natus Vincere rolls 818
+(1-1000)` was seen), so `ROLL_PATTERN` captures the name as `(.-)`, everything
+before the last ` rolls N (a-b)` on the line, not as a single word. The
+builder uses the pattern in contracts.md and writes the tests against the
+message text in orchestration.md Phase 0 results.
 
 ## Behaviour
 
@@ -87,6 +89,7 @@ Creates `src/Parse.lua` and `spec/Parse_spec.lua`. The spec loads
 | AC-02-06 | `Roll("Alice rolls 734 (1-1000)")` | `"Alice", 734, 1, 1000` `[P0-ROLL]` |
 | AC-02-07 | `Roll("Alice rolls 1 (1-1)")` | `"Alice", 1, 1, 1` |
 | AC-02-08 | `Roll("Alice-Stormrage rolls 5 (1-10)")` | `"Alice-Stormrage", 5, 1, 10` |
+| AC-02-08b | `Roll("Natus Vincere rolls 818 (1-1000)")` | `"Natus Vincere", 818, 1, 1000` `[P0-ROLL]` |
 | AC-02-09 | `Roll("Alice has gone offline.")`, `Roll("")`, `Roll(nil)` | `nil` |
 | AC-02-10 | `Roll("X wuerfelt 3 (1-9)", "^(%S+) wuerfelt (%d+) %((%d+)%-(%d+)%)$")` | `"X", 3, 1, 9` (custom pattern) |
 | AC-02-11 | `Command("g 1g 500")` | `{ name="g", args={"1g","500"} }` |
