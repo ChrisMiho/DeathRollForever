@@ -40,8 +40,10 @@ package merges.
 
 ### The frame (`src/UI.lua`)
 
-Built once, on the first `UI.Show()` (so `UnitFactionGroup` and `UnitName`
-are available), parented to `UIParent`, `DIALOG` strata, centred, clamped to
+Built once, on the first `UI.Show()` or the first Host change, whichever
+comes first (so `UnitFactionGroup` and `UnitName` are available, and a game
+started from `/dr g` can show the window before any `/dr show`), parented
+to `UIParent`, `DIALOG` strata, centred, clamped to
 the screen, sized and bounded as [visual.md 4.1](../visual.md#41-dimensions).
 `SetMovable(true)` and `SetResizable(true)`.
 
