@@ -27,6 +27,7 @@ local CHAT_EVENTS = {
 
 local game -- the running game, or nil
 local ticker -- the C_Timer ticker while a game is live, or nil
+local listener -- the one Host.OnChange listener, or nil
 local frame = CreateFrame("Frame")
 
 local function isMember(channel)
@@ -49,8 +50,11 @@ local function stop()
 	game = nil
 end
 
--- Post every rendered line of every event, in order, to the game's channel.
--- Once the game is no longer live, tear everything down.
+-- Post every rendered line of every event, in order, to the game's channel,
+-- then tell the listener. Once the game is no longer live, tear everything
+-- down; the listener has already seen the finished or cancelled game.
+-- post ends Start, tick and every chat or cancel path, so the listener runs
+-- at the end of each of them, even when a tick posted nothing (v2 section).
 local function post(events)
 	if not game then
 		return
@@ -59,6 +63,9 @@ local function post(events)
 		for _, line in ipairs(ns.Chat.Render(event, game)) do
 			SendChatMessage(line, game.channel) -- [P0-POST]
 		end
+	end
+	if listener then
+		listener(game)
 	end
 	if not ns.Rules.IsLive(game) then
 		stop()
@@ -127,12 +134,12 @@ function Host.Start(opts)
 
 	local events
 	game, events = ns.Rules.New(opts, GetTime())
-	post(events)
 	for _, chatEvent in ipairs(CHAT_EVENTS[game.channel]) do
 		frame:RegisterEvent(chatEvent)
 	end
 	frame:RegisterEvent("CHAT_MSG_SYSTEM")
 	ticker = C_Timer.NewTicker(1, tick)
+	post(events) -- kickoff, then the listener sees the new game last
 	return true
 end
 
@@ -142,4 +149,11 @@ function Host.Cancel()
 	end
 	post(ns.Rules.Cancel(game, GetTime()))
 	return true
+end
+
+-- v2: register the one change listener; a second call replaces the first.
+-- fn(game) runs at the end of Start, of every tick and of every post, with
+-- a finished or cancelled game before it is dropped. Never with nil.
+function Host.OnChange(fn)
+	listener = fn
 end

@@ -11,5 +11,7 @@ src\Money.lua
 src\Parse.lua
 src\Rules.lua
 src\Chat.lua
+src\View.lua
 src\Host.lua
+src\UI.lua
 src\Init.lua

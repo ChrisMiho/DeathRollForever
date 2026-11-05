@@ -23,6 +23,7 @@ local HELP = {
 	"/dr p <wager> [first roll]   start in party chat",
 	"/dr r <wager> [first roll]   start in raid chat",
 	"/dr cancel                   cancel the running game",
+	"/dr show                     open the window",
 	"/dr help                     this list",
 }
 
@@ -60,6 +61,8 @@ SlashCmdList.DEATHROLLFOREVER = function(text)
 		Start(name, command.args)
 	elseif name == "cancel" then
 		Cancel()
+	elseif name == "show" then
+		ns.UI.Show()
 	elseif name == "help" or name == "" then
 		PrintHelp()
 	else
