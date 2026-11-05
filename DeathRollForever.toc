@@ -7,5 +7,9 @@
 
 embeds.xml
 
+src\Money.lua
+src\Parse.lua
+src\Rules.lua
 src\Chat.lua
+src\Host.lua
 src\Init.lua
