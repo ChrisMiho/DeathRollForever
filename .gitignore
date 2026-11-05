@@ -1,0 +1,15 @@
+# Libraries are fetched from .pkgmeta (scripts/fetch-libs.sh), never committed
+/Libs/
+
+# Packager output and secrets
+/.release/
+.env
+
+# Build and test leftovers
+*.zip
+luacov.*.out
+
+# Local tooling state
+/.superpowers/
+.DS_Store
+Thumbs.db

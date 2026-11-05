@@ -1,0 +1,33 @@
+std = "lua51"
+max_line_length = 120
+codes = true
+
+exclude_files = {
+	"Libs/",
+	".release/",
+	".luacheckrc",
+}
+
+-- Globals this addon creates
+globals = {
+	"SlashCmdList",
+	"SLASH_DEATHROLLFOREVER1",
+	"SLASH_DEATHROLLFOREVER2",
+}
+
+-- WoW API this addon reads. Add each new API here as it is used,
+-- so a typo in an API name fails lint instead of failing in game.
+read_globals = {
+	"C_AddOns",
+	"CreateFrame",
+	"LibStub",
+}
+
+files["spec/"] = {
+	std = "+busted",
+	read_globals = { "LoadAddonFile" },
+}
+
+files["spec/helper.lua"] = {
+	globals = { "LoadAddonFile" },
+}

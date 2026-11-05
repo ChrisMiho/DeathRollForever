@@ -1,0 +1,28 @@
+package-as: DeathRollForever
+
+# Libraries come from the official Ace3 repository, pinned to a release tag.
+# To update: change every tag below to the newest Release-rNNNN tag at
+# https://github.com/WoWUIDev/Ace3/tags, run scripts/fetch-libs.sh, test in game.
+externals:
+  Libs/LibStub:
+    url: https://github.com/WoWUIDev/Ace3.git
+    tag: Release-r1403
+    path: LibStub
+  Libs/CallbackHandler-1.0:
+    url: https://github.com/WoWUIDev/Ace3.git
+    tag: Release-r1403
+    path: CallbackHandler-1.0
+  Libs/AceComm-3.0:
+    url: https://github.com/WoWUIDev/Ace3.git
+    tag: Release-r1403
+    path: AceComm-3.0
+
+# Development files that must not ship in the addon zip
+ignore:
+  - spec
+  - scripts
+  - PRD.md
+
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown

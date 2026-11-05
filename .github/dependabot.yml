@@ -1,0 +1,8 @@
+version: 2
+updates:
+  # Keeps the GitHub Actions in .github/workflows up to date.
+  # Ace3 library tags in .pkgmeta are updated by hand (see the note there).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
