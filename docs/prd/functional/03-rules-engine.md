@@ -168,7 +168,7 @@ startRoll=1000, joinWord="1", joinTime=60, turnTimer=45 }`, `t0 = 1000`,
 | AC-03-27 | 2-player game; `Tick(t + 45)` | `{forfeit, winner}` |
 | AC-03-28 | `Cancel` in lobby; `Cancel` in rolling | each `{cancelled host}`, phase `cancelled` |
 | AC-03-29 | `Current`, `Alive`, `IsLive` in lobby, rolling after an out, finished | `nil`/`{}`/`true`; `"Bob", 1000`/`{Bob,Carl}`/`true`; `nil`/`{Bob}`/`false` |
-| AC-03-30 | Full scripted game: 4 players with `rngOne`, a fixed list of rolls including wrong-range, out-of-turn, one 1 and one forfeit | the exact event sequence, written out in the spec |
+| AC-03-30 | Full scripted game: 4 players with `rngOne`, a fixed list of rolls including wrong-range, out-of-turn, two 1s (one mid-game, one that ends it) and one forfeit | the exact event sequence, written out in the spec |
 
 ### In-game (manual)
 
