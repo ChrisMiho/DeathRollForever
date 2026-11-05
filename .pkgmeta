@@ -2,7 +2,7 @@ package-as: DeathRollForever
 
 # Libraries come from the official Ace3 repository, pinned to a release tag.
 # To update: change every tag below to the newest Release-rNNNN tag at
-# https://github.com/WoWUIDev/Ace3/tags, run scripts/fetch-libs.sh, test in game.
+# https://github.com/WoWUIDev/Ace3/tags, run scripts/build.sh, test in game.
 externals:
   Libs/LibStub:
     url: https://github.com/WoWUIDev/Ace3.git

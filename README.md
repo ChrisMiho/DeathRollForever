@@ -27,18 +27,28 @@ libraries in it and will not load.
 - `luarocks install luacheck` and `luarocks install busted`
 - Git Bash (comes with Git for Windows) for the scripts in `scripts/`
 
-### First-time setup
+### Build
+
+In VS Code press `Ctrl+Shift+B` (task "Build and install"), or from Git Bash:
 
 ```bash
-scripts/fetch-libs.sh
+scripts/build.sh
 ```
 
-This fetches the libraries listed in `.pkgmeta` into `Libs/` (git-ignored).
-Then link the project into the game's AddOns folder, from an admin PowerShell:
+Each build runs the same packager as a release. It fetches the libraries
+listed in `.pkgmeta`, then:
 
-```powershell
-New-Item -ItemType Junction -Path "C:\Program Files (x86)\World of Warcraft\_forever_\Interface\AddOns\DeathRollForever" -Target "C:\Coding\DeathRollForever"
-```
+1. writes `.release/DeathRollForever-<version>.zip`, which holds one
+   `DeathRollForever` folder that teammates unzip into `Interface\AddOns`, and
+2. replaces `Interface\AddOns\DeathRollForever` in your game with the build.
+   Type `/reload` in game to load it.
+
+`scripts/build.sh --no-install` (task "Build zip only") skips step 2. If your
+game is not in the default folder, set `WOW_ADDONS_DIR` to your `AddOns` path.
+
+The version is the git tag on a tagged commit, or the short commit hash
+otherwise. New files must be `git add`ed before they appear in a build; the
+script warns about any that are not.
 
 ### Everyday checks
 
@@ -47,7 +57,8 @@ luacheck .
 busted
 ```
 
-CI runs the same two commands on every push and pull request.
+In VS Code these are the "Lint and test" task. CI runs the same two commands on
+every push and pull request.
 
 ### Layout
 
@@ -76,7 +87,7 @@ CI runs the same two commands on every push and pull request.
 
 Libraries are pinned to an Ace3 release tag in `.pkgmeta`. To update, change
 the tags to the newest one at <https://github.com/WoWUIDev/Ace3/tags>, run
-`scripts/fetch-libs.sh`, and test in game before releasing.
+`scripts/build.sh`, and test in game before releasing.
 
 ## Credits
 

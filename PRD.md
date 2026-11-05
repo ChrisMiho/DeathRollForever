@@ -251,8 +251,10 @@ are shortcuts for the same values.
   tag. It fetches the libraries, stamps the version into the `.toc`, and
   attaches a ready-to-install zip to the GitHub release. Friends install from
   that zip, never from the raw repository.
-- For local development the same `.pkgmeta` is used to fetch `Libs/` on this
-  PC, so the in-game copy matches what a release would contain.
+- Local builds (`scripts/build.sh`, or Ctrl+Shift+B in VS Code) run the same
+  packager. Each build writes a shareable zip with one `DeathRollForever` folder
+  inside and installs the built folder into the game's AddOns folder, so the
+  in-game copy always matches what teammates would get.
 
 ## 11. Saved data
 
@@ -264,8 +266,9 @@ are shortcuts for the same values.
 
 - GitHub repository for this folder, with `.gitignore`, `.pkgmeta`, `LICENSE`,
   `CHANGELOG.md` and a README.
-- Folder link from `_forever_\Interface\AddOns\DeathRollForever` to this folder
-  (this PC only, never shared).
+- Build script that packages, zips and installs into
+  `_forever_\Interface\AddOns\DeathRollForever` (replaces the earlier folder
+  link idea).
 - Editor with Lua support (VS Code, the Lua extension and WoW API definitions).
 - Lua 5.1 or LuaJIT, LuaRocks, luacheck (lint) and busted (unit tests) for
   checks outside the game.

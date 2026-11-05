@@ -28,7 +28,7 @@ local frame = CreateFrame("Frame")
 frame:RegisterEvent("PLAYER_LOGIN")
 frame:SetScript("OnEvent", function()
 	if not LibStub or not LibStub("AceComm-3.0", true) then
-		Print("|cffff4040AceComm-3.0 is missing. Run scripts/fetch-libs.sh.|r")
+		Print("|cffff4040AceComm-3.0 is missing. Install a build from scripts/build.sh.|r")
 		return
 	end
 	Print(ns.version .. " loaded. Type /dr.")
