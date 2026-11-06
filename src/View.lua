@@ -107,15 +107,26 @@ function View.StartOpts(channel, wagerText, rollMaxText)
 	return ns.Parse.StartArgs(key, args)
 end
 
--- 03-in-progress (package 08): Lobby, Game.
+-- 03-in-progress (package 15): Lobby, Game.
 
 -- Exact user-facing text of the lobby and rolling states (03-in-progress.md).
 local LOBBY_STATUS = "Type %s in %s chat to join"
-local STATUS_YOU = "You are up: /roll %d"
-local STATUS_OTHER = "%s is up: /roll %d"
 local ROLL_LABEL = "Roll 1-%d"
-local VALUE_OUT = "out"
-local VALUE_RANGE = "1-%d"
+local HEADER_COUNT = "%d of %d"
+local HEADER_ROLLED = "Rolled"
+local HEADER_ROLLED_AGAIN = "Rolled again"
+local HEADER_TIE_HIGH = "Tie for highest"
+local HEADER_TIE_LOW = "Tie for lowest"
+local HEADER_TIE_BOTH = "Tie for highest and lowest"
+local STATUS_EVERYONE = "Everyone: /roll %d"
+local STATUS_EVERYONE_AGAIN = "Everyone: /roll %d again"
+local STATUS_TIE = "%s: /roll %d again"
+local VALUE_WAITING = "waiting"
+local VALUE_SAT_OUT = "sat out"
+local TAG_HIGHEST = "highest"
+local TAG_LOWEST = "lowest"
+local TAG_REROLL = "re-roll"
+local TAG_REROLLED = "re-rolled %d"
 
 local function checkPhase(game, phase, fn)
 	if type(game) ~= "table" or game.phase ~= phase then
@@ -150,57 +161,200 @@ function View.Lobby(game, host, now)
 	}
 end
 
--- The rolling game: the order with each player's last roll, who is up, the
--- turn bar and the Roll button.
-function View.Game(game, host, now)
-	checkPhase(game, "rolling", "Game")
-	local current, range = ns.Rules.Current(game)
-	local secondsLeft, fraction = timeLeft(game.turnDeadline, now, game.turnTimer)
-
-	local lastRoll = {} -- name -> their most recent roll
-	for _, entry in ipairs(game.rolls) do
-		lastRoll[entry.name] = entry.roll
+local function contains(list, name)
+	for _, v in ipairs(list or {}) do
+		if v == name then
+			return true
+		end
 	end
+	return false
+end
+
+-- `names` reordered from both ends: the first, the last, the second, the
+-- second last, and so on, until the list is used up.
+local function fanOut(names)
+	local out = {}
+	local i, j = 1, #names
+	while i <= j do
+		out[#out + 1] = names[i]
+		if i < j then
+			out[#out + 1] = names[j]
+		end
+		i, j = i + 1, j - 1
+	end
+	return out
+end
+
+-- The standings of a game's main-round rolls as rows { name, you, value,
+-- mark } without tags, in the order every list shows them (03-in-progress,
+-- row groups 2 to 5; 04-winner's Result reuses it):
+--   2. highest: the current tie-break's high side, else the winner once
+--      decided, else everyone on the largest roll, in joined order;
+--   3. lowest: the tie-break's low side, else the loser once decided, else
+--      everyone on the smallest roll who is not already highest;
+--   4. the rest: everyone else in game.rolls, sorted highest first (ties in
+--      joined order) and fanned out from both ends;
+--   5. sat out: game.satOut, dimmed, with "sat out" as the value.
+-- The waiting group (1) is Game's own: it only exists in a main round.
+local function standings(game, host)
+	local rolls = game.rolls
+	local tie = game.tie or {}
+
+	local rolled = {} -- names in rolls, in joined order
+	local high, low
+	for _, name in ipairs(game.joined) do
+		local roll = rolls[name]
+		if roll ~= nil then
+			rolled[#rolled + 1] = name
+			high = (high == nil or roll > high) and roll or high
+			low = (low == nil or roll < low) and roll or low
+		end
+	end
+
+	local function onRoll(roll, except)
+		local names = {}
+		for _, name in ipairs(rolled) do
+			if rolls[name] == roll and not contains(except, name) then
+				names[#names + 1] = name
+			end
+		end
+		return names
+	end
+
+	local highest
+	if tie.high then
+		highest = tie.high
+	elseif game.winner then
+		highest = { game.winner }
+	else
+		highest = onRoll(high)
+	end
+	local lowest
+	if tie.low then
+		lowest = tie.low
+	elseif game.loser then
+		lowest = { game.loser }
+	else
+		lowest = onRoll(low, highest)
+	end
+
+	local rest = {}
+	for _, name in ipairs(rolled) do
+		if not contains(highest, name) and not contains(lowest, name) then
+			rest[#rest + 1] = name
+		end
+	end
+	local joinedIndex = {}
+	for i, name in ipairs(game.joined) do
+		joinedIndex[name] = i
+	end
+	table.sort(rest, function(a, b)
+		if rolls[a] ~= rolls[b] then
+			return rolls[a] > rolls[b]
+		end
+		return joinedIndex[a] < joinedIndex[b]
+	end)
 
 	local rows = {}
-	for i, name in ipairs(game.order) do
-		local out = game.status[name] ~= "in"
-		local value
-		if name == current then
-			value = VALUE_RANGE:format(range)
-		elseif out then
-			value = VALUE_OUT
-		elseif lastRoll[name] then
-			value = tostring(lastRoll[name])
-		else
-			value = ""
+	local function add(names, mark, value)
+		for _, name in ipairs(names) do
+			rows[#rows + 1] = {
+				name = name,
+				you = (name == host),
+				value = value or tostring(rolls[name]),
+				mark = mark,
+			}
 		end
-		rows[i] = {
-			n = i,
-			name = name,
-			you = (name == host),
-			current = (name == current),
-			out = out,
-			value = value,
-		}
 	end
+	add(highest, "high")
+	add(lowest, "low")
+	add(fanOut(rest), "")
+	add(game.satOut, "out", VALUE_SAT_OUT)
+	return rows
+end
 
-	local status
-	if current == host then
-		status = STATUS_YOU:format(range)
-	else
-		status = STATUS_OTHER:format(current, range)
+-- The tag of a standings row during a round: a tied player's re-roll state,
+-- else highest / lowest for those rows, else nothing.
+local function roundTag(game, row)
+	if row.mark ~= "high" and row.mark ~= "low" then
+		return ""
+	end
+	local tie = game.tie
+	if tie and (contains(tie.high, row.name) or contains(tie.low, row.name)) then
+		local reroll = game.tieRolls[row.name]
+		if reroll ~= nil then
+			return TAG_REROLLED:format(reroll)
+		end
+		return TAG_REROLL
+	end
+	if row.mark == "high" then
+		return TAG_HIGHEST
+	end
+	return TAG_LOWEST
+end
+
+local function headerLabel(game)
+	local tie = game.tie
+	if tie then
+		if tie.high and tie.low then
+			return HEADER_TIE_BOTH
+		elseif tie.high then
+			return HEADER_TIE_HIGH
+		end
+		return HEADER_TIE_LOW
+	end
+	if game.round > 1 then
+		return HEADER_ROLLED_AGAIN
+	end
+	return HEADER_ROLLED
+end
+
+local function roundStatus(game)
+	if game.tie then
+		return STATUS_TIE:format(table.concat(game.rollers, ", "), game.rollMax)
+	end
+	if game.round > 1 then
+		return STATUS_EVERYONE_AGAIN:format(game.rollMax)
+	end
+	return STATUS_EVERYONE:format(game.rollMax)
+end
+
+-- The rolling round: who is still to roll, the standings so far, the roll
+-- bar and the Roll button.
+function View.Game(game, host, now)
+	checkPhase(game, "rolling", "Game")
+	local waiting = ns.Rules.Waiting(game)
+	local secondsLeft, fraction = timeLeft(game.rollDeadline, now, game.rollTime)
+
+	local rows = {}
+	if not game.tie then
+		for _, name in ipairs(waiting) do
+			rows[#rows + 1] = { name = name, you = (name == host), value = VALUE_WAITING, tag = "", mark = "waiting" }
+		end
+	end
+	for _, row in ipairs(standings(game, host)) do
+		row.tag = roundTag(game, row)
+		rows[#rows + 1] = row
 	end
 
 	return {
 		subtitle = View.Subtitle(game),
+		header = {
+			label = headerLabel(game),
+			count = HEADER_COUNT:format(#game.rollers - #waiting, #game.rollers),
+		},
 		rows = rows,
-		status = status,
+		status = roundStatus(game),
 		secondsLeft = secondsLeft,
 		fraction = fraction,
-		button = { label = ROLL_LABEL:format(range), enabled = (current == host), range = range },
+		button = {
+			label = ROLL_LABEL:format(game.rollMax),
+			enabled = contains(waiting, host),
+			max = game.rollMax,
+		},
 	}
 end
+
 
 -- 04-winner (package 09): Result.
 

@@ -32,6 +32,14 @@ local _, ns = ...
 --   setMainButton(label, enabled): the main button's label and whether it is
 --     clickable (gray when not). 03's draw.rolling calls it every redraw.
 --
+--   newRow(parent) -> row and paintRow(row, model) (defined in 03's section):
+--     a list row and the one painter for every list of players. The model is
+--     a View row: { n, name, you } draws a numbered plain row (the lobby);
+--     { name, you, value, tag, mark } draws the name, the tag, (you) and the
+--     value painted by mark ("", "high", "low", "waiting", "out"). 03 uses it
+--     for the lobby and the rolling list; 04 (package 16) reuses it for the
+--     standings of the result.
+--
 --   shell: the built parts. shell.host (the host's short name), shell.faction
 --     ("Alliance", "Horde" or nil for neutral), shell.tint (View.TINT entry),
 --     shell.window, shell.content[state], shell.mainButton, shell.help,
@@ -492,32 +500,32 @@ function onMain.form()
 	end
 end
 
--- 03-in-progress (package 08): the lobby and the rolling game. The countdown,
--- the join bar and who joined; then the order with each player's last roll,
--- who is up, the turn bar and the Roll button. Spec:
--- docs/prd/visual/03-in-progress.md.
+-- 03-in-progress (package 15): the lobby and the rolling round. The
+-- countdown, the join bar and who joined; then who is still to roll, the
+-- highest and lowest so far, the rest, the roll bar and the Roll button.
+-- Spec: docs/prd/visual/03-in-progress.md.
 
 -- Exact user-facing text of the lobby and rolling states (03-in-progress.md).
--- The status lines, values and button label come from View.Lobby / View.Game.
+-- The header, status lines, values, tags and button label come from
+-- View.Lobby / View.Game.
 local PROGRESS_TEXT = {
 	secondsLeft = "SECONDS LEFT TO JOIN",
 	joined = "Joined",
 	you = "(you)",
-	upNow = "up now",
 	number = "%d.",
 }
 
 -- Sizes the shell has no name for.
 local PROGRESS_LAYOUT = {
 	rowInset = 8, -- row text to the row's edges
-	numberWidth = 24, -- the row number column
-	tagGap = 6, -- name to its tag, tag to the next tag
+	numberWidth = 24, -- the row number column (lobby rows only)
+	tagGap = 6, -- name to its tag, tag to (you)
 	labelGap = 4, -- countdown number to its label; status line to the bar
-	upNowAlpha = 0.85, -- the up now tag on the tinted row
+	tagAlpha = 0.85, -- the tag on a tinted row: white at reduced alpha
 }
 
 local lobby = {} -- the lobby's parts; filled by build.lobby
-local rolling = {} -- the rolling parts, the last drawn game and range; filled by build.rolling
+local rolling = {} -- the rolling parts, the last drawn game and max; filled by build.rolling
 
 -- A FontString in a font object and colour.
 local function newText(parent, fontObject, colour)
@@ -559,10 +567,23 @@ local function highlightWord(text, word, colour)
 	return text:sub(1, s) .. colourCode(colour) .. word .. "|r" .. text:sub(e)
 end
 
--- A list row (visual.md 4.4): number, name, `up now`, `(you)` and a
--- right-aligned value over a background shown on the current row, with the
--- strike line of visual.md 4.3 across the name, shown on an out row. Rows
--- are created by box:Layout on the first draw that needs them and reused.
+-- A header row (visual.md 4.4): a label at the left and a count at the
+-- right, both muted, anchored under `above` with the stacking gap.
+local function newHeader(parent, above)
+	local gap = LAYOUT.gap
+	local label = newText(parent, GameFontHighlight, PALETTE.muted)
+	label:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -gap)
+	local count = newText(parent, GameFontHighlight, PALETTE.muted)
+	count:SetPoint("TOPRIGHT", above, "BOTTOMRIGHT", 0, -gap)
+	count:SetJustifyH("RIGHT")
+	return label, count
+end
+
+-- A list row (visual.md 4.4): an optional number (lobby rows), the name, an
+-- optional tag and `(you)` after it, and a right-aligned value, over a
+-- background shown on a highest or lowest row. Rows are created by
+-- box:Layout on the first draw that needs them and reused; paintRow sets
+-- every field on every draw.
 local function newRow(parent)
 	local row = CreateFrame("Frame", nil, parent)
 	local inset = PROGRESS_LAYOUT.rowInset
@@ -575,44 +596,59 @@ local function newRow(parent)
 	row.number:SetWidth(PROGRESS_LAYOUT.numberWidth)
 	row.number:SetJustifyH("LEFT")
 	row.name = newText(row, GameFontHighlight, PALETTE.text)
-	row.name:SetPoint("LEFT", row.number, "RIGHT", 0, 0)
-	row.upNow = newText(row, GameFontHighlight, PALETTE.muted)
-	row.upNow:SetText(PROGRESS_TEXT.upNow)
-	row.upNow:SetPoint("LEFT", row.name, "RIGHT", PROGRESS_LAYOUT.tagGap, 0)
-	row.upNow:Hide()
+	row.tag = newText(row, GameFontHighlight, PALETTE.muted)
+	row.tag:SetPoint("LEFT", row.name, "RIGHT", PROGRESS_LAYOUT.tagGap, 0)
+	row.tag:Hide()
 	row.you = newText(row, GameFontHighlight, PALETTE.muted)
 	row.you:SetText(PROGRESS_TEXT.you)
-	row.you:SetPoint("LEFT", row.name, "RIGHT", PROGRESS_LAYOUT.tagGap, 0)
 	row.you:Hide()
 	row.value = newText(row, GameFontHighlight, PALETTE.muted)
 	row.value:SetPoint("RIGHT", row, "RIGHT", -inset, 0)
 	row.value:SetJustifyH("RIGHT")
-
-	-- The strike line sits in a frame one level up so it draws over the name.
-	local over = CreateFrame("Frame", nil, row)
-	over:SetAllPoints()
-	over:SetFrameLevel(row:GetFrameLevel() + 1)
-	row.strike = colourTexture(over, "OVERLAY", PALETTE.disabled)
-	row.strike:SetHeight(1)
-	row.strike:SetPoint("LEFT", row.name, "LEFT", 0, 0)
-	row.strike:SetPoint("RIGHT", row.name, "RIGHT", 0, 0)
-	row.strike:Hide()
 	return row
 end
 
--- Copies one view model row into a row frame. Lobby rows have no current,
--- out or value; they draw as plain rows.
+-- The tag on a tinted row: white at reduced alpha.
+local TAG_ON_TINT = { PALETTE.text[1], PALETTE.text[2], PALETTE.text[3], PROGRESS_LAYOUT.tagAlpha }
+
+-- How a row is painted by its mark (03-in-progress.md, "Rolling"): the
+-- background colour (nil for none) and the colours of the name, the tag,
+-- (you) and the value. A row with no mark (the lobby) is plain.
+local function rowColours(mark)
+	local white = PALETTE.text
+	if mark == "high" or mark == "low" then
+		return (mark == "high") and shell.tint.title or shell.tint.low, white, TAG_ON_TINT, white, white
+	elseif mark == "waiting" or mark == "out" then
+		return nil, PALETTE.disabled, PALETTE.muted, PALETTE.muted, PALETTE.disabled
+	end
+	return nil, PALETTE.text, PALETTE.muted, PALETTE.muted, PALETTE.muted
+end
+
+-- Copies one view model row into a row frame. Serves the lobby (rows
+-- { n, name, you }: numbered, plain), the rolling list (rows { name, you,
+-- value, tag, mark }: no number, painted by mark) and, in package 16, the
+-- standings of the result (the same without a tag).
 local function paintRow(row, model)
-	row.number:SetText(PROGRESS_TEXT.number:format(model.n))
+	row.name:ClearAllPoints()
+	if model.n then
+		row.number:SetText(PROGRESS_TEXT.number:format(model.n))
+		row.number:Show()
+		row.name:SetPoint("LEFT", row.number, "RIGHT", 0, 0)
+	else
+		row.number:Hide()
+		row.name:SetPoint("LEFT", row, "LEFT", PROGRESS_LAYOUT.rowInset, 0)
+	end
 	row.name:SetText(model.name)
 	row.value:SetText(model.value or "")
 
+	local tag = model.tag or ""
 	row.you:ClearAllPoints()
-	if model.current then
-		row.upNow:Show()
-		row.you:SetPoint("LEFT", row.upNow, "RIGHT", PROGRESS_LAYOUT.tagGap, 0)
+	if tag ~= "" then
+		row.tag:SetText(tag)
+		row.tag:Show()
+		row.you:SetPoint("LEFT", row.tag, "RIGHT", PROGRESS_LAYOUT.tagGap, 0)
 	else
-		row.upNow:Hide()
+		row.tag:Hide()
 		row.you:SetPoint("LEFT", row.name, "RIGHT", PROGRESS_LAYOUT.tagGap, 0)
 	end
 	if model.you then
@@ -621,32 +657,17 @@ local function paintRow(row, model)
 		row.you:Hide()
 	end
 
-	if model.current then
-		local white = PALETTE.text
+	local bg, nameColour, tagColour, youColour, valueColour = rowColours(model.mark)
+	if bg then
+		row.bg:SetColorTexture(unpack(bg))
 		row.bg:Show()
-		row.number:SetTextColor(unpack(white))
-		row.name:SetTextColor(unpack(white))
-		row.upNow:SetTextColor(white[1], white[2], white[3], PROGRESS_LAYOUT.upNowAlpha)
-		row.you:SetTextColor(unpack(white))
-		row.value:SetTextColor(unpack(white))
-	elseif model.out then
-		row.bg:Hide()
-		row.number:SetTextColor(unpack(PALETTE.muted))
-		row.name:SetTextColor(unpack(PALETTE.disabled))
-		row.you:SetTextColor(unpack(PALETTE.muted))
-		row.value:SetTextColor(unpack(PALETTE.disabled))
 	else
 		row.bg:Hide()
-		row.number:SetTextColor(unpack(PALETTE.muted))
-		row.name:SetTextColor(unpack(PALETTE.text))
-		row.you:SetTextColor(unpack(PALETTE.muted))
-		row.value:SetTextColor(unpack(PALETTE.muted))
 	end
-	if model.out then
-		row.strike:Show()
-	else
-		row.strike:Hide()
-	end
+	row.name:SetTextColor(unpack(nameColour))
+	row.tag:SetTextColor(unpack(tagColour))
+	row.you:SetTextColor(unpack(youColour))
+	row.value:SetTextColor(unpack(valueColour))
 end
 
 -- A subtitle in the hint font, muted, across the top of a content frame.
@@ -678,12 +699,9 @@ function build.lobby(parent)
 	lobby.bar:SetPoint("RIGHT", parent, "RIGHT", 0, 0)
 
 	-- 4. The header row: Joined at the left, the count at the right.
-	local header = newText(parent, GameFontHighlight, PALETTE.muted)
+	local header
+	header, lobby.count = newHeader(parent, lobby.bar)
 	header:SetText(PROGRESS_TEXT.joined)
-	header:SetPoint("TOPLEFT", lobby.bar, "BOTTOMLEFT", 0, -gap)
-	lobby.count = newText(parent, GameFontHighlight, PALETTE.muted)
-	lobby.count:SetPoint("TOPRIGHT", lobby.bar, "BOTTOMRIGHT", 0, -gap)
-	lobby.count:SetJustifyH("RIGHT")
 
 	-- 6. The status line, anchored above the main button, with the join word
 	-- in tint text (one string, the word wrapped in the colour code).
@@ -718,30 +736,37 @@ function build.rolling(parent)
 	-- 1. Subtitle.
 	rolling.subtitle = newSubtitle(parent)
 
-	-- 4. The turn bar, at the bottom.
+	-- 2. The header row: the round's label at the left, the count at the right.
+	rolling.header, rolling.count = newHeader(parent, rolling.subtitle)
+
+	-- 5. The roll bar, at the bottom.
 	rolling.bar = newProgressBar(parent)
 	rolling.bar:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 0, 0)
 	rolling.bar:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
 
-	-- 3. The status line, in tint text, directly over the bar.
+	-- 4. The status line, in tint text, directly over the bar.
 	rolling.status = newText(parent, GameFontHighlight, shell.tint.text)
 	rolling.status:SetPoint("BOTTOMLEFT", rolling.bar, "TOPLEFT", 0, PROGRESS_LAYOUT.labelGap)
 	rolling.status:SetPoint("BOTTOMRIGHT", rolling.bar, "TOPRIGHT", 0, PROGRESS_LAYOUT.labelGap)
 	rolling.status:SetJustifyH("LEFT")
 
-	-- 2. The list box, filling the room down to the status line.
+	-- 3. The list box, filling the room down to the status line.
 	rolling.list = newListBox(parent)
-	rolling.list.frame:SetPoint("TOPLEFT", rolling.subtitle, "BOTTOMLEFT", 0, -gap)
+	rolling.list.frame:SetPoint("TOPLEFT", rolling.header, "BOTTOMLEFT", 0, -gap)
 	rolling.list.frame:SetPoint("BOTTOMRIGHT", rolling.status, "TOPRIGHT", 0, gap)
 end
 
--- Every redraw sets the main button from button.label and button.enabled.
--- After a click on Roll the button stays gray until that roll has arrived:
--- rolling.pending is the game the click was for, and clears on the first
--- draw where the host is no longer up (or the game has changed).
+-- Every redraw repaints every row from the model and sets the main button
+-- from button.label and button.enabled. After a click on Roll the button
+-- stays gray until that roll has arrived: rolling.pending is the game and
+-- round the click was for, and clears on the first draw where the host is
+-- no longer waiting, or the game or round has changed (a tie-break the host
+-- is in re-enables the button).
 function draw.rolling(g, now)
 	local model = ns.View.Game(g, shell.host, now)
 	rolling.subtitle:SetText(model.subtitle)
+	rolling.header:SetText(model.header.label)
+	rolling.count:SetText(model.header.count)
 	rolling.status:SetText(model.status)
 	rolling.bar:SetValue(model.fraction)
 	local rows = rolling.list:Layout(#model.rows, newRow)
@@ -749,26 +774,29 @@ function draw.rolling(g, now)
 		paintRow(rows[i], row)
 	end
 
-	if not model.button.enabled or rolling.pending ~= g then
+	local pending = rolling.pending
+	if pending and (not model.button.enabled or pending.game ~= g or pending.round ~= g.round) then
 		rolling.pending = nil
 	end
 	rolling.game = g
+	rolling.round = g.round
 	rolling.label = model.button.label
-	rolling.range = model.button.range
+	rolling.max = model.button.max
 	setMainButton(model.button.label, model.button.enabled and not rolling.pending)
 end
 
--- Roll: RandomRoll(1, range) with the range from the last draw
--- [P0-CLICKROLL]; the button is gray until the roll result arrives, so a
--- second click before then does nothing.
+-- Roll: RandomRoll(1, max) with the max from the last draw [P0-CLICKROLL];
+-- the button is gray until the roll result arrives, so a second click before
+-- then does nothing.
 function onMain.rolling()
 	if rolling.pending then
 		return
 	end
-	rolling.pending = rolling.game
+	rolling.pending = { game = rolling.game, round = rolling.round }
 	setMainButton(rolling.label, false)
-	RandomRoll(1, rolling.range)
+	RandomRoll(1, rolling.max)
 end
+
 
 -- 04-winner (package 09): the result until Reset. The winner and who owes
 -- what; the main button reads Reset and 01 handles the click (onMain.winner
