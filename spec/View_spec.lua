@@ -441,65 +441,116 @@ describe("View", function()
 		end)
 	end)
 
-	-- 04-winner (package 09): Result.
+	-- 04-winner (package 16): Result.
 	describe("winner (04-winner)", function()
 		local finished
 
-		-- The finished fixture is built by hand as the document lists it:
-		-- raid, 1g, first roll 1000, five players, Alice won, host Eve.
+		-- The fixture's game options (04-winner.md, Automated).
+		local OPTS = {
+			host = "Eve",
+			channel = "RAID",
+			wager = 1000000,
+			rollMax = 100,
+			joinWord = "1",
+			joinTime = 60,
+			rollTime = 45,
+		}
+
+		-- A game from Rules: created at 940 with `names` joined one per second
+		-- after it, closed by Tick at 1000, `rolls` (pairs { name, roll }, the
+		-- range 1 to rollMax) made at 1001.
+		local function newRound(opts, names, rolls)
+			local game = Rules.New(opts, 940)
+			for i, name in ipairs(names) do
+				Rules.Join(game, name, 940 + i)
+			end
+			Rules.Tick(game, 1000)
+			for _, pair in ipairs(rolls) do
+				Rules.Roll(game, pair[1], pair[2], 1, opts.rollMax, 1001)
+			end
+			return game
+		end
+
+		-- The finished fixture: seven players, six rolled, Gina did not, and
+		-- the round settled on its deadline at 1045.
 		before_each(function()
-			finished = {
-				host = "Eve",
-				channel = "RAID",
-				wager = 10000,
-				startRoll = 1000,
-				phase = "finished",
-				order = { "Alice", "Bob", "Carl", "Dan", "Eve" },
-				winner = "Alice",
-			}
+			finished = newRound(OPTS, { "Alice", "Bob", "Carl", "Dan", "Eve", "Frank", "Gina" }, {
+				{ "Alice", 97 }, { "Bob", 61 }, { "Eve", 55 }, { "Frank", 40 }, { "Carl", 23 }, { "Dan", 8 },
+			})
+			Rules.Tick(finished, 1045)
+			assert.are.equal("finished", finished.phase)
 		end)
 
+		-- One field of every row, in order.
+		local function field(rows, key)
+			local out = {}
+			for i, row in ipairs(rows) do
+				out[i] = row[key]
+			end
+			return out
+		end
+
 		describe("Result", function()
-			it("AC-09-01 names the winner", function()
-				assert.are.equal("Alice", View.Result(finished, "Eve").winner)
-			end)
-
-			it("AC-09-02 one row per loser in order, (you) on the host, the wager as the amount", function()
-				assert.are.same({
-					{ text = "Bob owes Alice", you = false, amount = "1g" },
-					{ text = "Carl owes Alice", you = false, amount = "1g" },
-					{ text = "Dan owes Alice", you = false, amount = "1g" },
-					{ text = "Eve owes Alice", you = true, amount = "1g" },
-				}, View.Result(finished, "Eve").rows)
-			end)
-
-			it("AC-09-03 the total is the wager times the number of losers", function()
-				assert.are.equal("4g", View.Result(finished, "Eve").total)
-			end)
-
-			it("AC-09-04 two players show one row and a total with every part of the wager", function()
-				finished.order = { "Alice", "Bob" }
-				finished.winner = "Bob"
-				finished.wager = 15045
+			it("AC-16-01 names the winner and their roll as text", function()
 				local model = View.Result(finished, "Eve")
-				assert.are.same({ { text = "Alice owes Bob", you = false, amount = "1g 50s 45c" } }, model.rows)
-				assert.are.equal("1g 50s 45c", model.total)
+				assert.are.equal("Alice", model.winner)
+				assert.are.equal("97", model.winningRoll)
 			end)
 
-			it("AC-09-05 no row is (you) when the host won", function()
-				for _, row in ipairs(View.Result(finished, "Alice").rows) do
-					assert.is_false(row.you, row.text)
-				end
+			it("AC-16-02 rows: the winner, the loser, the rest fanned from both ends, the sat out", function()
+				local rows = View.Result(finished, "Eve").rows
+				assert.are.same({ "Alice", "Dan", "Bob", "Carl", "Eve", "Frank", "Gina" }, field(rows, "name"))
+				assert.are.same({ "high", "low", "", "", "", "", "out" }, field(rows, "mark"))
 			end)
 
-			it("AC-09-06 Result on a rolling game raises", function()
+			it("AC-16-03 row values are the roll or sat out, and (you) is on the host", function()
+				local rows = View.Result(finished, "Eve").rows
+				assert.are.same({ "97", "8", "61", "23", "55", "40", "sat out" }, field(rows, "value"))
+				assert.are.same({ false, false, false, false, true, false, false }, field(rows, "you"))
+			end)
+
+			it("AC-16-04 the debt names the loser and the winner with the amount owed", function()
+				assert.are.same(
+					{ text = "Dan owes Alice", you = false, amount = "89g" },
+					View.Result(finished, "Eve").debt
+				)
+			end)
+
+			it("AC-16-05 two players: the winner, the loser and the host's own debt", function()
+				local opts = {
+					host = "Bob", channel = "RAID", wager = 10000, rollMax = 1000, joinWord = "1", joinTime = 60, rollTime = 45,
+				}
+				local game = newRound(opts, { "Alice", "Bob" }, { { "Alice", 5 }, { "Bob", 2 } })
+				local model = View.Result(game, "Bob")
+				assert.are.same({
+					{ name = "Alice", you = false, value = "5", mark = "high" },
+					{ name = "Bob", you = true, value = "2", mark = "low" },
+				}, model.rows)
+				assert.are.same({ text = "Bob owes Alice", you = true, amount = "30c" }, model.debt)
+			end)
+
+			it("AC-16-06 a game won through a high tie-break keeps the tied loser of it among the rest", function()
+				local game = newRound(OPTS, { "Alice", "Bob", "Carl", "Dan", "Eve" }, {
+					{ "Alice", 97 }, { "Bob", 61 }, { "Carl", 40 }, { "Dan", 8 }, { "Eve", 97 },
+				})
+				Rules.Roll(game, "Alice", 50, 1, 100, 1002)
+				Rules.Roll(game, "Eve", 30, 1, 100, 1002)
+				local rows = View.Result(game, "Eve").rows
+				assert.are.same({ name = "Alice", you = false, value = "97", mark = "high" }, rows[1])
+				assert.are.equal("low", rows[2].mark)
+				assert.are.equal("Dan", rows[2].name)
+				assert.are.same({ "Eve", "Carl", "Bob" }, { rows[3].name, rows[4].name, rows[5].name })
+				assert.are.same({ name = "Eve", you = true, value = "97", mark = "" }, rows[3])
+			end)
+
+			it("AC-16-07 Result on a rolling game raises", function()
 				assert.has_error(function()
 					View.Result({ phase = "rolling" }, "Eve")
 				end)
 			end)
 
-			it("AC-09-07 the subtitle is View.Subtitle", function()
-				assert.are.equal("Raid chat, 1g per person, first roll 1-1000", View.Result(finished, "Eve").subtitle)
+			it("AC-16-08 the subtitle is View.Subtitle", function()
+				assert.are.equal("Raid chat, 100g per person, roll 1-100", View.Result(finished, "Eve").subtitle)
 			end)
 		end)
 	end)

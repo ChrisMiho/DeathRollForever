@@ -187,7 +187,7 @@ end
 
 -- The standings of a game's main-round rolls as rows { name, you, value,
 -- mark } without tags, in the order every list shows them (03-in-progress,
--- row groups 2 to 5; 04-winner's Result reuses it):
+-- row groups 2 to 5, and 04-winner's Result as the final standings):
 --   2. highest: the current tie-break's high side, else the winner once
 --      decided, else everyone on the largest roll, in joined order;
 --   3. lowest: the tie-break's low side, else the loser once decided, else
@@ -355,28 +355,26 @@ function View.Game(game, host, now)
 	}
 end
 
-
--- 04-winner (package 09): Result.
+-- 04-winner (package 16): Result.
 
 -- Exact user-facing text of the winner state (04-winner.md).
 local DEBT_TEXT = "%s owes %s"
 
--- The result: the winner and who owes what. One row per name in the order
--- that is not the winner; the host's row is marked (you).
+-- The result: the winner and their roll, the final standings and the one
+-- debt. The rows are the standings above (the winner highest, the loser
+-- lowest, the rest fanned out, the sat out last); the debt is what the loser
+-- owes the winner, marked (you) when the host is the loser.
 function View.Result(game, host)
 	checkPhase(game, "finished", "Result")
-	local winner = game.winner
-	local amount = ns.Money.Format(game.wager)
-	local rows = {}
-	for _, name in ipairs(game.order) do
-		if name ~= winner then
-			rows[#rows + 1] = { text = DEBT_TEXT:format(name, winner), you = (name == host), amount = amount }
-		end
-	end
 	return {
 		subtitle = View.Subtitle(game),
-		winner = winner,
-		rows = rows,
-		total = ns.Money.Format(game.wager * #rows),
+		winner = game.winner,
+		winningRoll = tostring(game.high),
+		rows = standings(game, host),
+		debt = {
+			text = DEBT_TEXT:format(game.loser, game.winner),
+			you = (game.loser == host),
+			amount = ns.Money.Format(game.owed),
+		},
 	}
 end
