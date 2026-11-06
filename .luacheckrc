@@ -8,6 +8,8 @@ exclude_files = {
 	".lua/",      -- Lua installed by CI (leafo/gh-actions-lua)
 	".luarocks/", -- LuaRocks installed by CI (leafo/gh-actions-luarocks)
 	".luacheckrc",
+	".worktrees/",   -- package worktrees made by the orchestrator
+	".superpowers/", -- local tooling state
 }
 
 -- Globals this addon creates
