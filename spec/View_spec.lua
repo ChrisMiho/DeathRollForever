@@ -151,65 +151,80 @@ describe("View", function()
 		end)
 	end)
 
-	-- 03-in-progress (package 08): Lobby, Game.
+	-- 03-in-progress (package 15): Lobby, Game.
 	describe("in progress (03-in-progress)", function()
-		local lobby, rolling
+		local lobby, rolling, tie
 
-		-- The lobby fixture comes from Rules: host Eve, raid, 1g, first roll
-		-- 1000, created at 1000, with Alice, Bob and Eve joined in that order.
-		local function newLobby()
-			local game = Rules.New({
-				host = "Eve",
-				channel = "RAID",
-				wager = 10000,
-				startRoll = 1000,
-				joinWord = "1",
-				joinTime = 60,
-				turnTimer = 45,
-			}, 1000)
-			Rules.Join(game, "Alice", 1001)
-			Rules.Join(game, "Bob", 1002)
-			Rules.Join(game, "Eve", 1003)
+		local OPTS = {
+			host = "Eve",
+			channel = "RAID",
+			wager = 1000000,
+			rollMax = 100,
+			joinWord = "1",
+			joinTime = 60,
+			rollTime = 45,
+		}
+
+		-- A game from Rules with `names` joined in order: created at `now`,
+		-- one join per second after it. The lobby closes at now + 60.
+		local function newGame(names, now)
+			local game = Rules.New(OPTS, now)
+			for i, name in ipairs(names) do
+				Rules.Join(game, name, now + i)
+			end
 			return game
 		end
 
-		-- The rolling fixture is built by hand as the document lists it.
-		local function newRolling()
-			return {
-				host = "Eve",
-				channel = "RAID",
-				wager = 10000,
-				startRoll = 1000,
-				joinWord = "1",
-				joinTime = 60,
-				turnTimer = 45,
-				phase = "rolling",
-				joined = { "Alice", "Bob", "Carl", "Dan", "Eve" },
-				order = { "Alice", "Bob", "Carl", "Dan", "Eve" },
-				status = { Alice = "in", Bob = "in", Carl = "out", Dan = "in", Eve = "in" },
-				eliminated = { "Carl" },
-				turn = 2,
-				range = 734,
-				turnDeadline = 1045,
-				remindersSent = {},
-				rolls = { { name = "Alice", roll = 734, max = 1000 } },
-			}
+		-- Rolls `/roll 100` for every { name, roll } pair, in order, at `now`.
+		local function rollAll(game, rolls, now)
+			for _, pair in ipairs(rolls) do
+				Rules.Roll(game, pair[1], pair[2], 1, 100, now)
+			end
 		end
 
+		-- A game from Rules closed at t = 1000 (created at 940) with `rolls`
+		-- made at 1001, as the document's fixture paragraph says.
+		local function newRound(names, rolls)
+			local game = newGame(names, 940)
+			Rules.Tick(game, 1000)
+			rollAll(game, rolls, 1001)
+			return game
+		end
+
+		local SEVEN = { "Alice", "Bob", "Carl", "Dan", "Eve", "Frank", "Gina" }
+		local SEVEN_ROLLS = {
+			{ "Alice", 97 }, { "Bob", 61 }, { "Eve", 55 }, { "Frank", 40 }, { "Carl", 23 }, { "Dan", 8 },
+		}
+
+		-- The lobby fixture: created at 1000 with Alice, Bob and Eve joined.
+		-- rolling: seven players, six rolled, Gina has not. tie: five players,
+		-- Alice and Eve both rolled 97, so a high tie-break started at 1001.
 		before_each(function()
-			lobby = newLobby()
-			rolling = newRolling()
+			lobby = newGame({ "Alice", "Bob", "Eve" }, 1000)
+			rolling = newRound(SEVEN, SEVEN_ROLLS)
+			tie = newRound({ "Alice", "Bob", "Carl", "Dan", "Eve" }, {
+				{ "Alice", 97 }, { "Bob", 61 }, { "Carl", 40 }, { "Dan", 8 }, { "Eve", 97 },
+			})
 		end)
 
+		-- One field of every row, in order.
+		local function field(rows, key)
+			local out = {}
+			for i, row in ipairs(rows) do
+				out[i] = row[key]
+			end
+			return out
+		end
+
 		describe("Lobby", function()
-			it("AC-08-01 counts the seconds left, the fraction and the joined", function()
+			it("AC-15-01 counts the seconds left, the fraction and the joined", function()
 				local model = View.Lobby(lobby, "Eve", 1018)
 				assert.are.equal(42, model.secondsLeft)
 				assert.is_near(0.7, model.fraction, 0.001)
 				assert.are.equal(3, model.count)
 			end)
 
-			it("AC-08-02 one row per joined player in join order, (you) on the host", function()
+			it("AC-15-02 one row per joined player in join order, (you) on the host", function()
 				assert.are.same({
 					{ n = 1, name = "Alice", you = false },
 					{ n = 2, name = "Bob", you = false },
@@ -217,108 +232,211 @@ describe("View", function()
 				}, View.Lobby(lobby, "Eve", 1018).rows)
 			end)
 
-			it("AC-08-03 the status line names the join word and the chat", function()
+			it("AC-15-03 the status line names the join word and the chat", function()
 				assert.are.equal("Type 1 in raid chat to join", View.Lobby(lobby, "Eve", 1018).status)
 			end)
 
-			it("AC-08-04 the seconds left round up", function()
-				assert.are.equal(60, View.Lobby(lobby, "Eve", 1000.2).secondsLeft)
-			end)
-
-			it("AC-08-05 past the deadline the seconds left and the fraction are 0", function()
+			it("AC-15-04 past the deadline the seconds left and the fraction are 0", function()
 				local model = View.Lobby(lobby, "Eve", 1070)
 				assert.are.equal(0, model.secondsLeft)
 				assert.are.equal(0, model.fraction)
 			end)
 
-			it("AC-08-06 the subtitle is View.Subtitle", function()
-				assert.are.equal(
-					"Raid chat, 1g per person, first roll 1-1000",
-					View.Lobby(lobby, "Eve", 1018).subtitle
-				)
+			it("AC-15-05 the subtitle is View.Subtitle", function()
+				assert.are.equal("Raid chat, 100g per person, roll 1-100", View.Lobby(lobby, "Eve", 1018).subtitle)
 			end)
 		end)
 
 		describe("Game", function()
-			it("AC-08-07 a player who rolled shows their last roll", function()
-				assert.are.same(
-					{ n = 1, name = "Alice", you = false, current = false, out = false, value = "734" },
-					View.Game(rolling, "Eve", 1014).rows[1]
-				)
+			it("AC-15-06 the header reads Rolled and how many of the rollers have", function()
+				assert.are.same({ label = "Rolled", count = "6 of 7" }, View.Game(rolling, "Eve", 1014).header)
 			end)
 
-			it("AC-08-08 the current player shows the range to roll", function()
-				assert.are.same(
-					{ n = 2, name = "Bob", you = false, current = true, out = false, value = "1-734" },
-					View.Game(rolling, "Eve", 1014).rows[2]
-				)
+			it("AC-15-07 rows: waiting, highest, lowest, then the rest fanned from both ends", function()
+				local rows = View.Game(rolling, "Eve", 1014).rows
+				assert.are.same({ "Gina", "Alice", "Dan", "Bob", "Carl", "Eve", "Frank" }, field(rows, "name"))
+				assert.are.same({ "waiting", "high", "low", "", "", "", "" }, field(rows, "mark"))
 			end)
 
-			it("AC-08-09 a player who rolled 1 is out", function()
-				assert.are.same(
-					{ n = 3, name = "Carl", you = false, current = false, out = true, value = "out" },
-					View.Game(rolling, "Eve", 1014).rows[3]
-				)
+			it("AC-15-08 row values are waiting or the roll", function()
+				local rows = View.Game(rolling, "Eve", 1014).rows
+				assert.are.same({ "waiting", "97", "8", "61", "23", "55", "40" }, field(rows, "value"))
 			end)
 
-			it("AC-08-10 the host who has not rolled shows an empty value and (you)", function()
-				assert.are.same(
-					{ n = 5, name = "Eve", you = true, current = false, out = false, value = "" },
-					View.Game(rolling, "Eve", 1014).rows[5]
-				)
+			it("AC-15-09 row tags are highest, lowest or empty, and (you) is on the host", function()
+				local rows = View.Game(rolling, "Eve", 1014).rows
+				assert.are.same({ "", "highest", "lowest", "", "", "", "" }, field(rows, "tag"))
+				assert.are.same({ false, false, false, false, false, true, false }, field(rows, "you"))
 			end)
 
-			it("AC-08-11 the status line names the current player and the range", function()
-				assert.are.equal("Bob is up: /roll 734", View.Game(rolling, "Eve", 1014).status)
+			it("AC-15-10 the status line tells everyone what to roll", function()
+				assert.are.equal("Everyone: /roll 100", View.Game(rolling, "Eve", 1014).status)
 			end)
 
-			it("AC-08-12 counts the seconds left in the turn and the fraction", function()
+			it("AC-15-11 counts the seconds left in the round and the fraction", function()
 				local model = View.Game(rolling, "Eve", 1014)
 				assert.are.equal(31, model.secondsLeft)
 				assert.is_near(31 / 45, model.fraction, 0.001)
 			end)
 
-			it("AC-08-13 the button reads the range and is disabled on another player's turn", function()
-				assert.are.same({ label = "Roll 1-734", enabled = false, range = 734 }, View.Game(rolling, "Eve", 1014).button)
+			it("AC-15-12 the button reads the range and is disabled once the host rolled", function()
+				assert.are.same({ label = "Roll 1-100", enabled = false, max = 100 }, View.Game(rolling, "Eve", 1014).button)
 			end)
 
-			it("AC-08-14 on the host's turn the status says You, the button is enabled and the row is current", function()
-				rolling.turn = 5
-				local model = View.Game(rolling, "Eve", 1014)
-				assert.are.equal("You are up: /roll 734", model.status)
+			it("AC-15-13 before the host rolled the button is enabled and the waiting rows are in rollers order", function()
+				local game = newRound(SEVEN, {
+					{ "Alice", 97 }, { "Bob", 61 }, { "Frank", 40 }, { "Carl", 23 }, { "Dan", 8 },
+				})
+				local model = View.Game(game, "Eve", 1014)
 				assert.is_true(model.button.enabled)
-				assert.is_true(model.rows[5].current)
-				assert.are.equal("1-734", model.rows[5].value)
+				assert.are.same({ "Eve", "Gina" }, { model.rows[1].name, model.rows[2].name })
+				assert.are.same({ "waiting", "waiting" }, { model.rows[1].mark, model.rows[2].mark })
+				assert.are.equal("high", model.rows[3].mark)
 			end)
 
-			it("AC-08-15 a player with two rolls shows the later one", function()
-				table.insert(rolling.rolls, { name = "Bob", roll = 500, max = 734 })
-				table.insert(rolling.rolls, { name = "Alice", roll = 120, max = 500 })
-				rolling.range = 120
-				rolling.turn = 4
-				assert.are.equal("120", View.Game(rolling, "Eve", 1014).rows[1].value)
+			it("AC-15-14 a fresh round shows every row waiting in joined order", function()
+				local game = newRound(SEVEN, {})
+				local model = View.Game(game, "Eve", 1001)
+				assert.are.same(SEVEN, field(model.rows, "name"))
+				for _, row in ipairs(model.rows) do
+					assert.are.equal("waiting", row.mark)
+					assert.are.equal("waiting", row.value)
+					assert.are.equal("", row.tag)
+				end
+				assert.are.equal("0 of 7", model.header.count)
 			end)
 
-			it("AC-08-16 a forfeited player is out", function()
-				rolling.status.Dan = "forfeit"
-				local row = View.Game(rolling, "Eve", 1014).rows[4]
-				assert.is_true(row.out)
-				assert.are.equal("out", row.value)
+			it("AC-15-15 one roll makes a highest row and no lowest row", function()
+				local game = newRound(SEVEN, { { "Alice", 97 } })
+				local rows = View.Game(game, "Eve", 1014).rows
+				assert.are.same({ "Bob", "Carl", "Dan", "Eve", "Frank", "Gina", "Alice" }, field(rows, "name"))
+				assert.are.same(
+					{ "waiting", "waiting", "waiting", "waiting", "waiting", "waiting", "high" },
+					field(rows, "mark")
+				)
+				assert.are.equal("highest", rows[7].tag)
 			end)
 
-			it("AC-08-17 past the turn deadline the seconds left and the fraction are 0", function()
+			it("AC-15-16 two equal rolls are both highest and make no lowest row", function()
+				local game = newRound(SEVEN, { { "Alice", 50 }, { "Bob", 50 } })
+				local rows = View.Game(game, "Eve", 1014).rows
+				assert.are.same({ "Carl", "Dan", "Eve", "Frank", "Gina", "Alice", "Bob" }, field(rows, "name"))
+				assert.are.same(
+					{ "waiting", "waiting", "waiting", "waiting", "waiting", "high", "high" },
+					field(rows, "mark")
+				)
+				assert.are.same({ "highest", "highest" }, { rows[6].tag, rows[7].tag })
+			end)
+
+			it("AC-15-17 a high tie-break's header names the tie and counts the tied", function()
+				assert.are.same({ label = "Tie for highest", count = "0 of 2" }, View.Game(tie, "Eve", 1002).header)
+			end)
+
+			it("AC-15-18 a tie-break keeps the tied on top with re-roll and no waiting group", function()
+				local rows = View.Game(tie, "Eve", 1002).rows
+				assert.are.same({ "Alice", "Eve", "Dan", "Bob", "Carl" }, field(rows, "name"))
+				assert.are.same({ "high", "high", "low", "", "" }, field(rows, "mark"))
+				assert.are.same({ "re-roll", "re-roll", "lowest", "", "" }, field(rows, "tag"))
+			end)
+
+			it("AC-15-19 a tie-break's status names the tied players", function()
+				assert.are.equal("Alice, Eve: /roll 100 again", View.Game(tie, "Eve", 1002).status)
+			end)
+
+			it("AC-15-20 the button is enabled while the tied host has not re-rolled", function()
+				assert.is_true(View.Game(tie, "Eve", 1002).button.enabled)
+			end)
+
+			it("AC-15-21 a tie-break roll shows as re-rolled next to the main-round roll", function()
+				Rules.Roll(tie, "Alice", 40, 1, 100, 1003)
+				local model = View.Game(tie, "Eve", 1004)
+				assert.are.equal("Alice", model.rows[1].name)
+				assert.are.equal("re-rolled 40", model.rows[1].tag)
+				assert.are.equal("97", model.rows[1].value)
+				assert.are.equal("1 of 2", model.header.count)
+			end)
+
+			it("AC-15-22 a tie-break at both ends names both and tags every tied row re-roll", function()
+				local game = newRound({ "Alice", "Bob", "Carl", "Dan" }, {
+					{ "Alice", 97 }, { "Bob", 97 }, { "Carl", 8 }, { "Dan", 8 },
+				})
+				local model = View.Game(game, "Eve", 1002)
+				assert.are.equal("Tie for highest and lowest", model.header.label)
+				assert.are.equal("Alice, Bob, Carl, Dan: /roll 100 again", model.status)
+				assert.are.same({ "Alice", "Bob", "Carl", "Dan" }, field(model.rows, "name"))
+				assert.are.same({ "high", "high", "low", "low" }, field(model.rows, "mark"))
+				assert.are.same({ "re-roll", "re-roll", "re-roll", "re-roll" }, field(model.rows, "tag"))
+			end)
+
+			it("AC-15-23 a rerun main round reads Rolled again with every row waiting", function()
+				local rolls = {}
+				for i, name in ipairs(SEVEN) do
+					rolls[i] = { name, 50 }
+				end
+				local game = newRound(SEVEN, rolls)
+				assert.are.equal(2, game.round)
+				local model = View.Game(game, "Eve", 1002)
+				assert.are.equal("Rolled again", model.header.label)
+				assert.are.equal("Everyone: /roll 100 again", model.status)
+				assert.are.same(
+					{ "waiting", "waiting", "waiting", "waiting", "waiting", "waiting", "waiting" },
+					field(model.rows, "mark")
+				)
+			end)
+
+			it("AC-15-24 past the roll deadline the seconds left and the fraction are 0", function()
 				local model = View.Game(rolling, "Eve", 1100)
 				assert.are.equal(0, model.secondsLeft)
 				assert.are.equal(0, model.fraction)
 			end)
-		end)
 
-		it("AC-08-18 Lobby on a rolling game and Game on a lobby game raise", function()
-			assert.has_error(function()
-				View.Lobby(rolling, "Eve", 1014)
+			it("AC-15-25 Lobby on a rolling game and Game on a lobby game raise", function()
+				assert.has_error(function()
+					View.Lobby(rolling, "Eve", 1014)
+				end)
+				assert.has_error(function()
+					View.Game(lobby, "Eve", 1018)
+				end)
 			end)
-			assert.has_error(function()
-				View.Game(lobby, "Eve", 1018)
+
+			it("AC-15-26 a player who missed the main round sits out, last, under a tie-break", function()
+				local game = newRound({ "Alice", "Bob", "Carl", "Dan" }, {
+					{ "Alice", 97 }, { "Bob", 97 }, { "Carl", 8 },
+				})
+				Rules.Tick(game, 1045)
+				local model = View.Game(game, "Eve", 1046)
+				assert.are.same({ "Alice", "Bob", "Carl", "Dan" }, field(model.rows, "name"))
+				assert.are.same({ "high", "high", "low", "out" }, field(model.rows, "mark"))
+				assert.are.same({ "re-roll", "re-roll", "lowest", "" }, field(model.rows, "tag"))
+				assert.are.equal("sat out", model.rows[4].value)
+				assert.are.equal("0 of 2", model.header.count)
+			end)
+
+			it("AC-15-27 a tied player who dropped out of a second tie-break is a plain row with their roll", function()
+				local game = newRound({ "Alice", "Bob", "Carl", "Dan" }, {
+					{ "Alice", 97 }, { "Bob", 97 }, { "Carl", 8 }, { "Dan", 97 },
+				})
+				rollAll(game, { { "Alice", 50 }, { "Dan", 50 } }, 1002)
+				Rules.Tick(game, 1046)
+				assert.are.equal(3, game.round)
+				local model = View.Game(game, "Eve", 1047)
+				assert.are.same({ "Alice", "Dan", "Carl", "Bob" }, field(model.rows, "name"))
+				assert.are.same({ "high", "high", "low", "" }, field(model.rows, "mark"))
+				assert.are.same({ "re-roll", "re-roll", "lowest", "" }, field(model.rows, "tag"))
+				assert.are.equal("97", model.rows[4].value)
+			end)
+
+			it("AC-15-28 a low roll-off with the winner decided keeps the winner highest", function()
+				local game = newRound({ "Alice", "Bob", "Carl", "Dan", "Eve" }, {
+					{ "Alice", 97 }, { "Bob", 8 }, { "Carl", 8 }, { "Dan", 8 }, { "Eve", 50 },
+				})
+				rollAll(game, { { "Bob", 40 } }, 1002)
+				Rules.Tick(game, 1046)
+				local model = View.Game(game, "Eve", 1047)
+				assert.are.same({ "Alice", "Carl", "Dan", "Eve", "Bob" }, field(model.rows, "name"))
+				assert.are.same({ "high", "low", "low", "", "" }, field(model.rows, "mark"))
+				assert.are.same({ "highest", "re-roll", "re-roll", "", "" }, field(model.rows, "tag"))
+				assert.are.same({ "50", "8" }, { model.rows[4].value, model.rows[5].value })
 			end)
 		end)
 	end)
