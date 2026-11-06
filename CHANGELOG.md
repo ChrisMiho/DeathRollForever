@@ -5,6 +5,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- Rules: a game is now one round. Everyone rolls `/roll 100` once within 45 seconds; the highest roll wins, the lowest pays `(highest - lowest)%` of the wager, anyone who does not roll sits out, an all-equal round is rerun, and ties for highest or lowest go to a tie-break roll among the tied only (a tied player who does not roll drops out, or pays if tied for lowest).
+
 ## [0.1.0] - 2026-11-06
 
 The host's window. Type `/dr show` to open it: fill in the chat, wager and
