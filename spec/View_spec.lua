@@ -13,7 +13,7 @@ describe("View", function()
 		Rules = ns.Rules
 	end)
 
-	-- 01-window (package 06): TINT, State, ChatName, Subtitle.
+	-- 01-window (package 14): TINT, State, ChatName, Subtitle, Help.
 	describe("window (01-window)", function()
 		describe("State", function()
 			it("AC-06-01 State(nil) is form", function()
@@ -46,27 +46,27 @@ describe("View", function()
 		end)
 
 		describe("Subtitle", function()
-			it("AC-06-07 capitalises the chat and formats a round wager", function()
+			it("AC-14-01 capitalises the chat and formats a round wager and the roll max", function()
 				assert.are.equal(
-					"Raid chat, 1g per person, first roll 1-1000",
-					View.Subtitle({ channel = "RAID", wager = 10000, startRoll = 1000 })
+					"Raid chat, 100g per person, roll 1-100",
+					View.Subtitle({ channel = "RAID", wager = 1000000, rollMax = 100 })
 				)
 			end)
 
-			it("AC-06-08 shows every non-zero part of the wager and the start roll", function()
+			it("AC-14-02 shows every non-zero part of the wager and the roll max", function()
 				assert.are.equal(
-					"Guild chat, 1g 50s 45c per person, first roll 1-500",
-					View.Subtitle({ channel = "GUILD", wager = 15045, startRoll = 500 })
+					"Guild chat, 1g 50s 45c per person, roll 1-500",
+					View.Subtitle({ channel = "GUILD", wager = 15045, rollMax = 500 })
 				)
 			end)
 		end)
 
 		describe("TINT", function()
-			it("AC-06-09 both factions have title, button and text as rgb triples in 0..1", function()
+			it("AC-14-03 both factions have title, button, text and low as rgb triples in 0..1", function()
 				for _, faction in ipairs({ "Alliance", "Horde" }) do
 					local tint = View.TINT[faction]
 					assert.is_table(tint, faction)
-					for _, role in ipairs({ "title", "button", "text" }) do
+					for _, role in ipairs({ "title", "button", "text", "low" }) do
 						local colour = tint[role]
 						assert.is_table(colour, faction .. "." .. role)
 						assert.are.equal(3, #colour, faction .. "." .. role)
@@ -78,42 +78,63 @@ describe("View", function()
 				end
 			end)
 		end)
+
+		describe("Help", function()
+			it("AC-14-04 gives the six lines of the hover box in order", function()
+				assert.are.same({
+					"Type 1 in chat to join.",
+					"When called, everyone types /roll 100 once.",
+					"Highest roll wins, lowest roll pays.",
+					"Owed: (highest - lowest) x wager / 100.",
+					"A tie for highest or lowest re-rolls.",
+					"No roll in time: you sit out.",
+				}, View.Help("1", 100))
+			end)
+
+			it("AC-14-05 fills in another join word and roll max", function()
+				local lines = View.Help("roll", 1000)
+				assert.are.equal(6, #lines)
+				assert.are.equal("Type roll in chat to join.", lines[1])
+				assert.are.equal("When called, everyone types /roll 1000 once.", lines[2])
+				assert.are.equal("Owed: (highest - lowest) x wager / 1000.", lines[4])
+			end)
+		end)
 	end)
 
-	-- 02-form (package 07): StartOpts.
+	-- 02-form (package 14): StartOpts.
 	describe("form (02-form)", function()
 		describe("StartOpts", function()
-			it("AC-07-01 guild, 1g and 1000 give the full opts", function()
+			it("AC-07-01 guild, 1g and 100 give the full opts", function()
 				assert.are.same(
-					{ channel = "GUILD", wager = 10000, startRoll = 1000 },
-					View.StartOpts("GUILD", "1g", "1000")
+					{ channel = "GUILD", wager = 10000, rollMax = 100 },
+					View.StartOpts("GUILD", "1g", "100")
 				)
 			end)
 
-			it("AC-07-02 an empty first roll leaves startRoll nil", function()
+			it("AC-07-02 an empty roll max leaves rollMax nil", function()
 				local opts, err = View.StartOpts("PARTY", "50s", "")
 				assert.is_nil(err)
 				assert.are.same({ channel = "PARTY", wager = 5000 }, opts)
-				assert.is_nil(opts.startRoll)
+				assert.is_nil(opts.rollMax)
 			end)
 
-			it("AC-07-03 the wager is passed whole and the first roll is trimmed", function()
+			it("AC-07-03 the wager is passed whole and the roll max is trimmed", function()
 				assert.are.same(
-					{ channel = "RAID", wager = 15000, startRoll = 500 },
+					{ channel = "RAID", wager = 15000, rollMax = 500 },
 					View.StartOpts("RAID", "1g 50s", "  500 ")
 				)
 			end)
 
 			it("AC-07-04 a bad wager gives Money.ERROR", function()
-				local opts, err = View.StartOpts("GUILD", "abc", "1000")
+				local opts, err = View.StartOpts("GUILD", "abc", "100")
 				assert.is_nil(opts)
 				assert.are.equal(Money.ERROR, err)
 			end)
 
-			it("AC-07-05 a first roll of 1 gives Parse.FIRST_ROLL_ERROR", function()
+			it("AC-07-05 a roll max of 1 gives Parse.ROLL_MAX_ERROR", function()
 				local opts, err = View.StartOpts("GUILD", "1g", "1")
 				assert.is_nil(opts)
-				assert.are.equal(Parse.FIRST_ROLL_ERROR, err)
+				assert.are.equal(Parse.ROLL_MAX_ERROR, err)
 			end)
 
 			it("AC-07-06 an empty wager gives Money.ERROR", function()

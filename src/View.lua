@@ -7,22 +7,35 @@ local _, ns = ...
 local View = {}
 ns.View = View
 
--- 01-window (package 06): TINT, State, ChatName, Subtitle.
+-- 01-window (package 14): TINT, State, ChatName, Subtitle, Help.
 
 -- Faction tints, 0..1 rgb (contracts 5.6, visual.md 4.2).
--- title: title bar, current row; button: main button, bar fill;
--- text: big numbers, status line.
+-- title: title bar, highest row; button: main button, bar fill;
+-- text: big numbers, status line; low: lowest row.
 View.TINT = {
 	Alliance = {
 		title = { 0.114, 0.302, 0.690 },
 		button = { 0.165, 0.388, 0.847 },
 		text = { 0.553, 0.706, 1.000 },
+		low = { 0.431, 0.133, 0.133 },
 	},
 	Horde = {
 		title = { 0.490, 0.110, 0.110 },
 		button = { 0.831, 0.231, 0.231 },
 		text = { 1.000, 0.612, 0.612 },
+		low = { 0.420, 0.290, 0.102 },
 	},
+}
+
+-- The hover box under the title bar's `?` (01-window.md), one format per
+-- line. %s is the join word, %d the roll max.
+local HELP_LINES = {
+	"Type %s in chat to join.",
+	"When called, everyone types /roll %d once.",
+	"Highest roll wins, lowest roll pays.",
+	"Owed: (highest - lowest) x wager / %d.",
+	"A tie for highest or lowest re-rolls.",
+	"No roll in time: you sit out.",
 }
 
 local STATE_BY_PHASE = {
@@ -49,14 +62,27 @@ function View.ChatName(channel)
 	return CHAT_NAME[channel]
 end
 
--- "Raid chat, 1g per person, first roll 1-1000"
+-- "Raid chat, 100g per person, roll 1-100"
 function View.Subtitle(game)
 	local chat = View.ChatName(game.channel)
 	chat = chat:sub(1, 1):upper() .. chat:sub(2)
-	return chat .. " chat, " .. ns.Money.Format(game.wager) .. " per person, first roll 1-" .. game.startRoll
+	return chat .. " chat, " .. ns.Money.Format(game.wager) .. " per person, roll 1-" .. game.rollMax
 end
 
--- 02-form (package 07): StartOpts.
+-- The six lines of the hover box, in order, with the join word and roll max
+-- filled in.
+function View.Help(joinWord, rollMax)
+	return {
+		HELP_LINES[1]:format(joinWord),
+		HELP_LINES[2]:format(rollMax),
+		HELP_LINES[3],
+		HELP_LINES[4]:format(rollMax),
+		HELP_LINES[5],
+		HELP_LINES[6],
+	}
+end
+
+-- 02-form (package 14): StartOpts.
 
 local COMMAND_KEY = {
 	GUILD = "g",
@@ -65,18 +91,18 @@ local COMMAND_KEY = {
 }
 
 -- The form's three inputs as the opts Parse.StartArgs returns:
--- { channel, wager, startRoll } or nil, errorText. The wager is passed whole
--- (Money.Parse accepts "1g 50s"); the first roll is trimmed and left out when
+-- { channel, wager, rollMax } or nil, errorText. The wager is passed whole
+-- (Money.Parse accepts "1g 50s"); the roll max is trimmed and left out when
 -- empty. Any other channel is a programmer mistake.
-function View.StartOpts(channel, wagerText, startRollText)
+function View.StartOpts(channel, wagerText, rollMaxText)
 	local key = COMMAND_KEY[channel]
 	if not key then
 		error("StartOpts: unknown channel " .. tostring(channel), 2)
 	end
 	local args = { wagerText }
-	local startRoll = (startRollText or ""):match("^%s*(.-)%s*$")
-	if startRoll ~= "" then
-		args[2] = startRoll
+	local rollMax = (rollMaxText or ""):match("^%s*(.-)%s*$")
+	if rollMax ~= "" then
+		args[2] = rollMax
 	end
 	return ns.Parse.StartArgs(key, args)
 end
