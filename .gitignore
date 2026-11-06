@@ -17,3 +17,6 @@ luacov.*.out
 /.superpowers/
 .DS_Store
 Thumbs.db
+
+# Package worktrees made by the orchestrator (docs/prd/orchestration.md)
+/.worktrees/
