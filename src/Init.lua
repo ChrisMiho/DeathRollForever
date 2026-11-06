@@ -18,12 +18,13 @@ end
 ns.version = GetVersion()
 ns.Print = Print
 
+-- The help lines, exactly as 05-host-controller.md lists them, /dr first.
 local HELP = {
-	"/dr g <wager> [first roll]   start in guild chat (1g, 50s, 1g50s, 1.5g)",
-	"/dr p <wager> [first roll]   start in party chat",
-	"/dr r <wager> [first roll]   start in raid chat",
+	"/dr                          open the window",
+	"/dr g <wager> [roll max]     start in guild chat (1g, 50s, 1g50s, 1.5g)",
+	"/dr p <wager> [roll max]     start in party chat",
+	"/dr r <wager> [roll max]     start in raid chat",
 	"/dr cancel                   cancel the running game",
-	"/dr show                     open the window",
 	"/dr help                     this list",
 }
 
@@ -54,16 +55,19 @@ end
 
 SLASH_DEATHROLLFOREVER1 = "/dr"
 SLASH_DEATHROLLFOREVER2 = "/deathroll"
+-- Dispatch on the command name (05-host-controller.md): an empty name opens
+-- the window, a channel name starts, cancel cancels, help lists the commands,
+-- anything else (show included) is unknown.
 SlashCmdList.DEATHROLLFOREVER = function(text)
 	local command = ns.Parse.Command(text)
 	local name = command.name
-	if ns.Parse.CHANNELS[name] then
+	if name == "" then
+		ns.UI.Show()
+	elseif ns.Parse.CHANNELS[name] then
 		Start(name, command.args)
 	elseif name == "cancel" then
 		Cancel()
-	elseif name == "show" then
-		ns.UI.Show()
-	elseif name == "help" or name == "" then
+	elseif name == "help" then
 		PrintHelp()
 	else
 		Print("Unknown command.")
