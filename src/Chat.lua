@@ -17,7 +17,7 @@ function Chat.Prefix(text)
 end
 
 -- [P0-DISTANCE] answered 2026-11-05: a far-away, ungrouped guild member's
--- roll is not seen by the host, so this sentence is always on in v1.
+-- roll is not seen by the host, so this sentence is always on.
 local STAY_NEAR = " Stay near the host so your rolls are seen."
 
 local function names(list)
@@ -30,8 +30,9 @@ local renderers = {}
 
 function renderers.kickoff(_, game)
 	return string.format(
-		"Death roll starting! %s per person, first roll 1-%d. Type %s here to join. %d seconds! (%ds per turn)",
-		ns.Money.Format(game.wager), game.startRoll, game.joinWord, game.joinTime, game.turnTimer
+		"Death roll starting! %s per person. Everyone rolls 1-%d once: highest wins, lowest pays the difference. "
+			.. "Type %s here to join. %d seconds!",
+		ns.Money.Format(game.wager), game.rollMax, game.joinWord, game.joinTime
 	) .. STAY_NEAR
 end
 
@@ -47,46 +48,49 @@ function renderers.closed(event)
 	return string.format("Joining closed! %d players in: %s", #event.joined, names(event.joined))
 end
 
-function renderers.order(event)
-	return "Roll order: " .. names(event.order)
-end
-
 function renderers.call(event)
-	return string.format("%s, you're up! Type /roll %d", event.name, event.range)
+	return string.format("Everyone, type /roll %d now! %d seconds.", event.max, event.seconds)
 end
 
 function renderers.wrongRange(event)
-	return string.format("%s, wrong range. Type /roll %d", event.name, event.range)
+	return string.format("%s, wrong range. Type /roll %d", event.name, event.max)
 end
 
 function renderers.reminder(event)
-	return string.format("%s, %d seconds! Type /roll %d", event.name, event.secondsLeft, event.range)
+	return string.format("%d seconds! Still to roll: %s. Type /roll %d",
+		event.secondsLeft, names(event.names), event.max)
 end
 
-function renderers.forfeit(event)
-	return string.format("%s did not roll in time and is OUT. %d left.", event.name, event.left)
+function renderers.satOut(event)
+	local verb = #event.names == 1 and "sits" or "sit"
+	return string.format("%s did not roll in time and %s out.", names(event.names), verb)
 end
 
-function renderers.out(event)
-	local line = string.format("%s rolled 1 and is OUT! %d left.", event.name, event.left)
-	if event.left > 1 then
-		line = line .. " Range resets."
+function renderers.allTied(event)
+	return string.format("Everyone rolled %d! Roll again.", event.roll)
+end
+
+function renderers.tieBreak(event)
+	local line = ""
+	if event.high then
+		line = line .. "Tie for highest: " .. names(event.high) .. ". "
 	end
-	return line
+	if event.low then
+		line = line .. "Tie for lowest: " .. names(event.low) .. ". "
+	end
+	return line .. string.format("Tied players, type /roll %d again! %d seconds.", event.max, event.seconds)
 end
 
 function renderers.winner(event)
-	local wager = ns.Money.Format(event.wager)
-	if #event.losers == 1 then
-		return string.format("WINNER: %s! %s owes %s %s.", event.name, event.losers[1], event.name, wager)
-	end
-	return string.format("WINNER: %s! %s each owe %s %s (%s total).",
-		event.name, names(event.losers), event.name, wager, ns.Money.Format(event.total))
+	return string.format("WINNER: %s with %d! %s rolled %d and owes %s %s.",
+		event.name, event.high, event.loser, event.low, event.name, ns.Money.Format(event.owed))
 end
 
 function renderers.cancelled(event)
 	if event.reason == "tooFew" then
 		return string.format("Not enough players (need %d). Game cancelled.", ns.Rules.MIN_PLAYERS)
+	elseif event.reason == "noRolls" then
+		return "Nobody rolled the tie-break. Game cancelled."
 	end
 	return "Game cancelled by the host."
 end
