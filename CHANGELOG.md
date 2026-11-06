@@ -7,6 +7,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 - Commands: `/dr g <wager> [roll max]` (and `/dr p`, `/dr r`) replaces the first-roll argument; the roll max is the top of the range everyone rolls, from 2 to 1000000, and the usage and error lines say so.
+- Announcements: the `[DeathRoll]` chat lines now follow the one-round rules: the kickoff explains that everyone rolls once and the lowest pays the difference, one call tells everyone to roll with the seconds allowed, reminders list who is still to roll, players who miss the roll sit out, tie-breaks name the tied players, the winner line gives both rolls and the amount owed, and a tie-break nobody rolled cancels the game.
 
 ## [0.1.0] - 2026-11-06
 
