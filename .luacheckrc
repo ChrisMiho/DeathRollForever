@@ -28,6 +28,7 @@ read_globals = {
 	"GameFontHighlight",
 	"GameFontNormalHuge",
 	"GameFontNormalLarge",
+	"GameTooltip",
 	"GetTime",
 	"IsInGroup",
 	"IsInGuild",

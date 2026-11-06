@@ -2,10 +2,11 @@ local _, ns = ...
 
 -- UI: the host's window (glue). Copies ns.View models into frames and
 -- computes no text and no number of its own.
--- Spec: docs/prd/visual/01-window.md (this shell: frame, title bar, corner,
--- main button, footer, grip, moving, resizing, showing, the state switch and
--- the redraw) and 02-form.md, 03-in-progress.md, 04-winner.md, which fill
--- the build / draw / onMain stubs below, one state each.
+-- Spec: docs/prd/visual/01-window.md (this shell: frame, title bar, the `?`
+-- and its hover box, corner, main button, footer, grip, moving, resizing,
+-- showing, the state switch and the redraw) and 02-form.md,
+-- 03-in-progress.md, 04-winner.md, which fill the build / draw / onMain
+-- stubs below, one state each.
 --
 -- Helpers for the state packages (all local to this file):
 --
@@ -33,9 +34,9 @@ local _, ns = ...
 --
 --   shell: the built parts. shell.host (the host's short name), shell.faction
 --     ("Alliance", "Horde" or nil for neutral), shell.tint (View.TINT entry),
---     shell.window, shell.content[state], shell.mainButton, shell.corner,
---     shell.footer. PALETTE and LAYOUT hold every colour and size of
---     visual.md 4.1 and 4.2.
+--     shell.window, shell.content[state], shell.mainButton, shell.help,
+--     shell.corner, shell.footer. PALETTE and LAYOUT hold every colour and
+--     size of visual.md 4.1 and 4.2.
 
 local UI = {}
 ns.UI = UI
@@ -70,6 +71,7 @@ local LAYOUT = {
 	buttonHeight = 44,
 	gripSize = 16,
 	cornerInset = 8,
+	helpSize = 20, -- the ? button, 8 px (cornerInset) left of the corner
 	iconSize = 16,
 	scrollBarWidth = 16,
 }
@@ -87,6 +89,8 @@ local BACKDROP = {
 -- Exact user-facing text of this package (01-window.md).
 local TEXT = {
 	title = "Death roll",
+	help = "?",
+	helpTitle = "How it works", -- the hover box's title; its lines are View.Help
 	close = "×",
 	cancel = "Cancel",
 	neutral = "Neutral",
@@ -285,19 +289,33 @@ local function cancel()
 	end
 end
 
--- 02-form (package 07): the form. Chat, wager, first roll and the note; the
+-- The hover box under the ? (01-window.md): the title, then the six lines of
+-- View.Help in white, wrapped. The join word and roll max are the current
+-- game's when there is one (live or finished), else Rules.DEFAULTS.
+local function showHelp(button)
+	local source = game or ns.Rules.DEFAULTS
+	GameTooltip:SetOwner(button, "ANCHOR_BOTTOM")
+	GameTooltip:AddLine(TEXT.helpTitle)
+	for _, line in ipairs(ns.View.Help(source.joinWord, source.rollMax)) do
+		GameTooltip:AddLine(line, 1, 1, 1, true)
+	end
+	GameTooltip:Show()
+end
+
+-- 02-form (package 14): the form. Chat, wager, roll max and the note; the
 -- main button reads Start. Spec: docs/prd/visual/02-form.md.
 
 -- Exact user-facing text of the form (02-form.md). The note's chat name and
--- numbers come from View.ChatName and Rules.DEFAULTS.
+-- numbers come from View.ChatName and Rules.DEFAULTS; so does the roll max
+-- default.
 local FORM_TEXT = {
 	chat = "Chat",
 	wager = "Wager per person",
-	firstRoll = "First roll",
+	rollMax = "Roll max",
 	hint = "1g, 50s, 1g50s or 1.5g",
-	note = "Players join by typing %s in %s chat. %s s to join, %s s per turn.",
+	rollMaxHint = "Everyone rolls 1 to this. 100 makes the gap a percentage.",
+	note = "Players join by typing %s in %s chat. %s s to join, %s s to roll.",
 	wagerDefault = "1g",
-	firstRollDefault = "1000",
 }
 
 local CHAT_BUTTONS = {
@@ -313,7 +331,7 @@ local FORM_LAYOUT = {
 	boxHeight = 20, -- InputBoxTemplate's art is 20 px tall
 	boxArtLeft = 5, -- the template's left art sits this far left of the box
 	wagerLetters = 20,
-	firstRollLetters = 7,
+	rollMaxLetters = 7,
 }
 
 local form = {} -- the form's parts and its selected channel; filled by build.form
@@ -360,8 +378,20 @@ local function selectChat(channel)
 		defaults.joinWord,
 		ns.View.ChatName(channel),
 		defaults.joinTime,
-		defaults.turnTimer
+		defaults.rollTime
 	))
+end
+
+-- A hint in the hint font, muted, under an edit box.
+local function newHint(parent, box, text)
+	local hint = parent:CreateFontString(nil, "OVERLAY")
+	hint:SetFontObject(GameFontDisable)
+	hint:SetTextColor(unpack(PALETTE.muted))
+	hint:SetText(text)
+	hint:SetPoint("TOPLEFT", box, "BOTTOMLEFT", -FORM_LAYOUT.boxArtLeft, -FORM_LAYOUT.labelGap)
+	hint:SetPoint("RIGHT", parent, "RIGHT", 0, 0)
+	hint:SetJustifyH("LEFT")
+	return hint
 end
 
 function build.form(parent)
@@ -416,22 +446,20 @@ function build.form(parent)
 	wagerBox:SetPoint("RIGHT", parent, "RIGHT", 0, 0)
 	wagerBox:SetText(FORM_TEXT.wagerDefault)
 
-	local hint = parent:CreateFontString(nil, "OVERLAY")
-	hint:SetFontObject(GameFontDisable)
-	hint:SetTextColor(unpack(PALETTE.muted))
-	hint:SetText(FORM_TEXT.hint)
-	hint:SetPoint("TOPLEFT", wagerBox, "BOTTOMLEFT", -FORM_LAYOUT.boxArtLeft, -labelGap)
+	local hint = newHint(parent, wagerBox, FORM_TEXT.hint)
 
-	-- 3. First roll: a numeric edit box.
-	local firstRollLabel = newLabel(parent, FORM_TEXT.firstRoll)
-	firstRollLabel:SetPoint("TOPLEFT", hint, "BOTTOMLEFT", 0, -gap)
+	-- 3. Roll max: a numeric edit box with a hint under it.
+	local rollMaxLabel = newLabel(parent, FORM_TEXT.rollMax)
+	rollMaxLabel:SetPoint("TOPLEFT", hint, "BOTTOMLEFT", 0, -gap)
 
-	local firstRollBox = newEditBox(parent, FORM_LAYOUT.firstRollLetters)
-	form.firstRollBox = firstRollBox
-	firstRollBox:SetNumeric(true)
-	firstRollBox:SetPoint("TOPLEFT", firstRollLabel, "BOTTOMLEFT", FORM_LAYOUT.boxArtLeft, -labelGap)
-	firstRollBox:SetPoint("RIGHT", parent, "RIGHT", 0, 0)
-	firstRollBox:SetText(FORM_TEXT.firstRollDefault)
+	local rollMaxBox = newEditBox(parent, FORM_LAYOUT.rollMaxLetters)
+	form.rollMaxBox = rollMaxBox
+	rollMaxBox:SetNumeric(true)
+	rollMaxBox:SetPoint("TOPLEFT", rollMaxLabel, "BOTTOMLEFT", FORM_LAYOUT.boxArtLeft, -labelGap)
+	rollMaxBox:SetPoint("RIGHT", parent, "RIGHT", 0, 0)
+	rollMaxBox:SetText(tostring(ns.Rules.DEFAULTS.rollMax))
+
+	newHint(parent, rollMaxBox, FORM_TEXT.rollMaxHint)
 
 	-- 4. The note, anchored above the main button.
 	local note = parent:CreateFontString(nil, "OVERLAY")
@@ -451,9 +479,9 @@ function draw.form()
 	selectChat(form.channel)
 end
 
--- Start: what /dr g <wager> [first roll] does. Errors print through ns.Print.
+-- Start: what /dr g <wager> [roll max] does. Errors print through ns.Print.
 function onMain.form()
-	local opts, optsError = ns.View.StartOpts(form.channel, form.wagerBox:GetText(), form.firstRollBox:GetText())
+	local opts, optsError = ns.View.StartOpts(form.channel, form.wagerBox:GetText(), form.rollMaxBox:GetText())
 	if not opts then
 		ns.Print(optsError)
 		return
@@ -913,6 +941,19 @@ local function ensureBuilt()
 		else
 			UI.Hide()
 		end
+	end)
+
+	-- The ? help button: a translucent white pill like Cancel's, 8 px left of
+	-- the corner, present in every state; hovering shows the hover box.
+	local help = newFlatButton(titleBar, GameFontHighlight)
+	shell.help = help
+	help:SetSize(LAYOUT.helpSize, LAYOUT.helpSize)
+	help:SetPoint("RIGHT", corner, "LEFT", -LAYOUT.cornerInset, 0)
+	help.label:SetText(TEXT.help)
+	paintButton(help, PALETTE.pill, PALETTE.pillHover, PALETTE.text)
+	help:HookScript("OnEnter", showHelp)
+	help:HookScript("OnLeave", function()
+		GameTooltip:Hide()
 	end)
 
 	-- 4. Footer: the faction name under the main button.
