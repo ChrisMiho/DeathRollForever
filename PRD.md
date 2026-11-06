@@ -23,7 +23,7 @@ Goals
 - Run a whole event (lobby, one round of rolls, the result, who owes what)
   from chat, in a couple of minutes.
 - Require the addon only on the host.
-- Keep the game moving: timers, reminders, forfeits.
+- Keep the game moving: timers, reminders, sat-outs.
 - Later: make settling up visible, who owes whom and who has paid.
 
 Non-goals
@@ -80,10 +80,10 @@ title bar and returns to where you were.
   Last game's values remembered.
 - **Lobby:** title line, big countdown that turns red under 10 s, joined
   players in join order with a count, Join button, host-only Cancel.
-- **Game:** roll order as a list with eliminated players struck through and
-  the current player highlighted, status line with what to type, last five
-  rolls, big ROLL button enabled only on your turn, turn timer bar, host-only
-  Kick and Cancel.
+- **Game:** who is still to roll dimmed at the top, the highest roll tinted,
+  the lowest under it, the rest fanned out from both ends, status line with
+  what to type, big ROLL button until you have rolled, roll timer bar,
+  host-only Kick and Cancel.
 - **Result:** winner, the ledger with a tick per paid debt, your record
   against the winner, Close.
 - **Settings:** join time, roll time, roll max, join word, auto-roll, paid

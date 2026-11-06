@@ -135,7 +135,8 @@ Font objects that exist on the client; the builder sets colours with
 |------|-------------|--------|
 | title, main button | `GameFontNormalLarge` | text (white) |
 | body: names, values, field labels, status line, `?` | `GameFontHighlight` | text, or muted, or tint text |
-| hints, subtitle, footer, headers | `GameFontDisable` | muted |
+| hints, subtitle, footer | `GameFontDisable` | muted |
+| list headers (`Joined`, `Rolled 3 of 5`) | `GameFontHighlight` | muted |
 | countdown number | `NumberFontNormalHuge` | tint text |
 | winner's name and roll | `GameFontNormalHuge` | tint text |
 

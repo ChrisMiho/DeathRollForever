@@ -120,21 +120,21 @@ local shown -- the state currently drawn, or nil before the first redraw
 -- Hooks the state packages fill: build[state](parent) once at build,
 -- draw[state](game, now) on every redraw, onMain[state]() on a main button click.
 local build = {
-	form = nil, -- 02-form (package 07): set below
-	lobby = nil, -- 03-in-progress (package 08): set below
-	rolling = nil, -- 03-in-progress (package 08): set below
-	winner = nil, -- 04-winner (package 09): set below
+	form = nil, -- 02-form (package 14): set below
+	lobby = nil, -- 03-in-progress (package 15): set below
+	rolling = nil, -- 03-in-progress (package 15): set below
+	winner = nil, -- 04-winner (package 16): set below
 }
 local draw = {
-	form = nil, -- 02-form (package 07): set below
-	lobby = nil, -- 03-in-progress (package 08): set below
-	rolling = nil, -- 03-in-progress (package 08): set below
-	winner = nil, -- 04-winner (package 09): set below
+	form = nil, -- 02-form (package 14): set below
+	lobby = nil, -- 03-in-progress (package 15): set below
+	rolling = nil, -- 03-in-progress (package 15): set below
+	winner = nil, -- 04-winner (package 16): set below
 }
 local onMain = {
-	form = nil, -- 02-form (package 07): set below
+	form = nil, -- 02-form (package 14): set below
 	lobby = function() end, -- nothing: the button is gray
-	rolling = nil, -- 03-in-progress (package 08): set below
+	rolling = nil, -- 03-in-progress (package 15): set below
 	winner = nil, -- set below: forget the game and redraw
 }
 
