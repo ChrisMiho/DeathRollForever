@@ -46,9 +46,10 @@ loaded line ends with `Type /dr.`, which now opens the window.
    Ambiguate(UnitName("player"), "short")`, `joinWord`, `joinTime`,
    `rollTime` from `Rules.DEFAULTS`.
 4. `game, events = Rules.New(opts, GetTime())`. Keep `game` in a local.
-5. Post the events (below). Register the chat events for that channel only
-   (table in contracts section 7) and `CHAT_MSG_SYSTEM`. Start
-   `C_Timer.NewTicker(1, tick)`. Return `true`.
+5. Register the chat events for that channel only (table in contracts
+   section 7) and `CHAT_MSG_SYSTEM`. Start `C_Timer.NewTicker(1, tick)`.
+   Post the events (below), so the listener sees a game whose ticker is
+   already running. Return `true`.
 
 ### Post (internal)
 
