@@ -1,6 +1,6 @@
 # 04 Winner: the result until Reset
 
-Status: draft v2. Owns the `winner` section of `src/UI.lua` and `src/View.lua` (`View.Result`) and its tests in `spec/View_spec.lua`. Package 09.
+Status: v2 implemented. Last verified against code: 2026-11-06 (in-game by the host). Owns the `winner` section of `src/UI.lua` and `src/View.lua` (`View.Result`) and its tests in `spec/View_spec.lua`. Package 09.
 
 ## Purpose and scope
 

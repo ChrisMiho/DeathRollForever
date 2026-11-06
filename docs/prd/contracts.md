@@ -1,6 +1,6 @@
 # Contracts
 
-Status: v1 implemented; v2 additions draft. Last verified against code: 2026-11-05.
+Status: v1 and v2 implemented. Last verified against code: 2026-11-06.
 
 Everything that parallel builders share. A builder reads this, their own
 feature document and `CLAUDE.md`, and nothing else. If a feature needs

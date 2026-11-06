@@ -1,6 +1,6 @@
 # 01 Window: the frame, the corner, moving, resizing, states
 
-Status: draft v2. Owns `src/UI.lua` (the shell), `src/View.lua` (`TINT`, `State`, `ChatName`, `Subtitle`) and `spec/View_spec.lua` (their tests). Package 06.
+Status: v2 implemented. Last verified against code: 2026-11-06 (in-game by the host). Owns `src/UI.lua` (the shell), `src/View.lua` (`TINT`, `State`, `ChatName`, `Subtitle`) and `spec/View_spec.lua` (their tests). Package 06.
 
 ## Purpose and scope
 

@@ -4,9 +4,9 @@ The specs for DeathRollForever live in this folder. This page is the only one
 an agent loads by default. Find the document that owns what you are changing,
 load it and [contracts.md](contracts.md), and nothing else.
 
-Current version: **v2, the host's window**, being built on top of v1 (the
+Current version: **v2, the host's window**, implemented on top of v1 (the
 host runs a game from chat, released as v0.0.1).
-Labels: `v1` is implemented. `v2` is in scope now. `out of scope for v2`
+Labels: `v1` and `v2` are implemented. `out of scope for v2`
 marks documents and features that are planned but not written or built yet;
 the label comes off when that version starts.
 
@@ -66,7 +66,7 @@ Every change to behaviour, whether a feature or a bug fix, goes like this:
 | Version | Adds | Status |
 |---------|------|--------|
 | v1 | Host runs a whole game from chat. Kickoff, join by chat, countdowns, shuffled order, calls, turn timer, forfeits, winner line with who owes what | implemented, v0.0.1 |
-| v2 | The host's window: form, lobby, rolling and winner states, Roll and Cancel buttons, `/dr show`, faction tint, movable and resizable | spec written, being built |
+| v2 | The host's window: form, lobby, rolling and winner states, Roll and Cancel buttons, `/dr show`, faction tint, movable and resizable | implemented, verified in game 2026-11-06 |
 | v3 | Sync: addon players see the window live, Roll button for them, auto-roll if allowed | out of scope for v2 |
 | v4 | Ledger and trade detection: debts marked paid, `/dr owed` | out of scope for v2 |
 | v5 | Settings view and saved variables (window position and size, defaults), history and stats, host reload resume | out of scope for v2 |

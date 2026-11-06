@@ -1,6 +1,6 @@
 # Orchestration: building v2
 
-Status: draft v2. For the agent that runs the build. Sub-agents never read
+Status: v2 implemented (2026-11-06). For the agent that runs the build. Sub-agents never read
 this; they get a brief from section 4. The v1 version of this document is in
 git history (tag `v0.0.1`).
 

@@ -1,6 +1,6 @@
 # Visual PRD: the host's window
 
-Status: draft v2. The product overview is [PRD.md](../../PRD.md) section 5;
+Status: v2 implemented. Last verified against code: 2026-11-06 (in-game by the host). The product overview is [PRD.md](../../PRD.md) section 5;
 this document is the behaviour of the window and the look every state
 shares. Each state's detail, exact text and acceptance criteria is in a
 sub-document under [visual/](visual/).

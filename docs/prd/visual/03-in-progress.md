@@ -1,6 +1,6 @@
 # 03 In progress: the lobby and the rolling game
 
-Status: draft v2. Owns the `lobby` and `rolling` sections of `src/UI.lua` and `src/View.lua` (`View.Lobby`, `View.Game`) and their tests in `spec/View_spec.lua`. Package 08.
+Status: v2 implemented. Last verified against code: 2026-11-06 (in-game by the host). Owns the `lobby` and `rolling` sections of `src/UI.lua` and `src/View.lua` (`View.Lobby`, `View.Game`) and their tests in `spec/View_spec.lua`. Package 08.
 
 ## Purpose and scope
 

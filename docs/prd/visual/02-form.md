@@ -1,6 +1,6 @@
 # 02 Form: chat, wager, first roll, Start
 
-Status: draft v2. Owns the `form` sections of `src/UI.lua` and `src/View.lua` (`View.StartOpts`) and their tests in `spec/View_spec.lua`. Package 07.
+Status: v2 implemented. Last verified against code: 2026-11-06 (in-game by the host). Owns the `form` sections of `src/UI.lua` and `src/View.lua` (`View.StartOpts`) and their tests in `spec/View_spec.lua`. Package 07.
 
 ## Purpose and scope
 

@@ -1,6 +1,6 @@
 # 05 Host controller: slash commands, chat in, lines out, the ticker
 
-Status: v1 implemented; v2 additions draft (section "v2 additions" below). Last verified against code: 2026-11-05. Owns `src/Host.lua`, `src/Init.lua`.
+Status: v1 and v2 implemented (section "v2 additions" below). Last verified against code: 2026-11-06. Owns `src/Host.lua`, `src/Init.lua`.
 
 ## Purpose and scope
 
