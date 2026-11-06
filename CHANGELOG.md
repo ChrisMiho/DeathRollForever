@@ -5,6 +5,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-06
+
+The host's window. Type `/dr show` to open it: fill in the chat, wager and
+first roll and click `Start` instead of typing `/dr g 1g`, watch the lobby
+countdown and who joined, follow the roll order with each player's last
+roll, and click `Roll` on your turn to roll the right range. The window
+turns blue or red for your faction. Every `/dr` command still works.
+
 ### Added
 - Window: `/dr show` opens a movable, resizable window with a faction-tinted title bar, an `×` (or `Cancel` while a game runs) in the corner, one main button and the faction name under it; it follows every game and cannot be hidden mid-game.
 - Form: with no game running the window shows `Chat` (Guild, Party, Raid), `Wager per person` and `First roll` with a `Start` button that does what `/dr g <wager> [first roll]` does; Enter in a box also starts, errors print to the chat frame and the values stay for the next game.
