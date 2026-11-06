@@ -1,8 +1,8 @@
 local _, ns = ...
 
--- Host: the only glue in v1. Feeds chat into the rules engine, posts every
--- rendered line, and ticks the engine once a second while a game is live.
--- No rules and no chat text of its own: those live in Rules and Chat.
+-- Host: the only glue besides the window. Feeds chat into the rules engine,
+-- posts every rendered line, and ticks the engine once a second while a game
+-- is live. No rules and no chat text of its own: those live in Rules and Chat.
 -- Spec: docs/prd/functional/05-host-controller.md.
 
 local Host = {}
@@ -72,11 +72,13 @@ local function post(events)
 	end
 end
 
+-- Every second: countdowns, the lobby closing, reminders, a round settling on
+-- its deadline. No rng: v3 has no shuffle.
 local function tick()
 	if not game then
 		return
 	end
-	post(ns.Rules.Tick(game, GetTime(), math.random))
+	post(ns.Rules.Tick(game, GetTime()))
 end
 
 local function onChannelMessage(text, sender)
@@ -123,14 +125,16 @@ function Host.Start(opts)
 	if not isMember(opts.channel) then
 		return nil, NOT_IN[opts.channel]
 	end
+	-- opts comes from Parse.StartArgs or View.StartOpts with channel, wager
+	-- and an optional rollMax; the rest is filled from the defaults.
 	local defaults = ns.Rules.DEFAULTS
-	if opts.startRoll == nil then
-		opts.startRoll = defaults.startRoll
+	if opts.rollMax == nil then
+		opts.rollMax = defaults.rollMax
 	end
 	opts.host = Ambiguate(UnitName("player"), "short")
 	opts.joinWord = defaults.joinWord
 	opts.joinTime = defaults.joinTime
-	opts.turnTimer = defaults.turnTimer
+	opts.rollTime = defaults.rollTime
 
 	local events
 	game, events = ns.Rules.New(opts, GetTime())
