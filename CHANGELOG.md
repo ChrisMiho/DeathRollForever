@@ -5,6 +5,15 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-06
+
+One round instead of turns. Everyone rolls `/roll 100` once, the highest
+roll wins and the lowest pays the difference: `(highest - lowest)` percent of
+the wager with the default roll max of 100. Type `/dr` to open the window,
+`/dr g 1g` to start from chat, `/dr help` for the commands and hover the `?`
+in the window for the rules. This replaces the turn-based game of 0.1.0,
+which played too slowly.
+
 ### Changed
 - Rules: a game is now one round. Everyone rolls `/roll 100` once within 45 seconds; the highest roll wins, the lowest pays `(highest - lowest) x wager / roll max` (with the default roll max of 100, the gap as a percentage of the wager), anyone who does not roll sits out, an all-equal round is rerun, and ties for highest or lowest go to a tie-break roll among the tied only (a tied player who does not roll drops out, or pays if tied for lowest).
 - Announcements: the `[DeathRoll]` chat lines now follow the one-round rules: the kickoff explains that everyone rolls once and the lowest pays the difference, one call tells everyone to roll with the seconds allowed, reminders list who is still to roll, players who miss the roll sit out, tie-breaks name the tied players, the winner line gives both rolls and the amount owed, and a tie-break nobody rolled cancels the game.

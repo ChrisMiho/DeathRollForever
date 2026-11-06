@@ -4,7 +4,7 @@ A World of Warcraft: Forever addon for running multiplayer death roll events
 in party, raid or guild chat. Only the host needs the addon; everyone else
 plays by typing in chat and using `/roll`.
 
-Status: v0.0.1, the host runs a whole game from chat. See [PRD.md](PRD.md) for the full design and roadmap.
+Status: v0.2.0, one round where everyone rolls once and the lowest pays the difference, run from chat or the host's window. See [PRD.md](PRD.md) for the full design and roadmap.
 
 Guild games: the host only sees `/roll` results from players in the same area
 or in the same group. For a guild game, invite the players to a raid so rolls
