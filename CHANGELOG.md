@@ -5,6 +5,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- Commands: `/dr g <wager> [roll max]` (and `/dr p`, `/dr r`) replaces the first-roll argument; the roll max is the top of the range everyone rolls, from 2 to 1000000, and the usage and error lines say so.
+
 ## [0.1.0] - 2026-11-06
 
 The host's window. Type `/dr show` to open it: fill in the chat, wager and

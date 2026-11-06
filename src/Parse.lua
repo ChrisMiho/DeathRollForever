@@ -18,11 +18,11 @@ Parse.CHANNELS = {
 	r = "RAID", raid = "RAID",
 }
 
-Parse.USAGE = "Usage: /dr g|p|r <wager> [first roll]"
-Parse.FIRST_ROLL_ERROR = "First roll must be a whole number from 2 to 1000000"
+Parse.USAGE = "Usage: /dr g|p|r <wager> [roll max]"
+Parse.ROLL_MAX_ERROR = "Roll max must be a whole number from 2 to 1000000"
 
-local FIRST_ROLL_MIN = 2
-local FIRST_ROLL_MAX = 1000000
+local ROLL_MAX_MIN = 2
+local ROLL_MAX_MAX = 1000000
 
 local function trim(text)
 	return text:match("^%s*(.-)%s*$")
@@ -61,21 +61,21 @@ function Parse.Command(text)
 	return command
 end
 
--- A whole number from FIRST_ROLL_MIN to FIRST_ROLL_MAX, digits only.
-local function parseFirstRoll(text)
+-- A whole number from ROLL_MAX_MIN to ROLL_MAX_MAX, digits only.
+local function parseRollMax(text)
 	local digits = text:match("^(%d+)$")
 	if not digits then
 		return nil
 	end
 	local value = tonumber(digits)
-	if value < FIRST_ROLL_MIN or value > FIRST_ROLL_MAX then
+	if value < ROLL_MAX_MIN or value > ROLL_MAX_MAX then
 		return nil
 	end
 	return value
 end
 
 -- Steps follow the spec's numbered list, so the first problem found is the
--- one reported: channel, wager, first roll, then extra arguments.
+-- one reported: channel, wager, roll max, then extra arguments.
 function Parse.StartArgs(name, args)
 	local channel = Parse.CHANNELS[name]
 	if not channel then
@@ -88,15 +88,15 @@ function Parse.StartArgs(name, args)
 	if not wager then
 		return nil, wagerError
 	end
-	local startRoll
+	local rollMax
 	if args[2] ~= nil then
-		startRoll = parseFirstRoll(args[2])
-		if not startRoll then
-			return nil, Parse.FIRST_ROLL_ERROR
+		rollMax = parseRollMax(args[2])
+		if not rollMax then
+			return nil, Parse.ROLL_MAX_ERROR
 		end
 	end
 	if args[3] ~= nil then
 		return nil, Parse.USAGE
 	end
-	return { channel = channel, wager = wager, startRoll = startRoll }
+	return { channel = channel, wager = wager, rollMax = rollMax }
 end
