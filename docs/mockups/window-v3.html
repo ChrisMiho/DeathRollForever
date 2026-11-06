@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en" data-faction="alliance">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Death roll: one-round mockup</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+:root {
+	color-scheme: dark;
+	--page: #111218; --page-fg: #d6d7de; --page-muted: #80828f;
+	--win: #1b1c23; --win-border: #2c2e38; --row: #24262f; --row-border: #2f313c;
+	--text: #ecedf2; --muted: #8b8d99; --disabled: #767884; --disabled-bg: #2e303a;
+	--danger: #ff5c5c; --danger-deep: #6e2222;
+	--tint: #2a63d8; --tint-deep: #1d4db0; --tint-text: #8db4ff;
+	--font: "Inter", "Segoe UI", system-ui, sans-serif;
+}
+:root[data-faction="horde"] { --tint: #d43b3b; --tint-deep: #7d1c1c; --tint-text: #ff9c9c; --danger: #ffb45c; --danger-deep: #6b4a1a; }
+html, body { background: var(--page); color: var(--page-fg); margin: 0; }
+body { font-family: var(--font); padding: 24px 16px 48px; }
+.toolbar { max-width: 1320px; margin: 0 auto 20px; display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; }
+.toolbar h1 { font: 600 20px/1.2 var(--font); color: var(--text); margin: 0; }
+.toolbar p { margin: 0; color: var(--page-muted); font-size: 14px; flex-basis: 100%; max-width: 80ch; }
+.seg { display: inline-flex; background: var(--row); border-radius: 8px; padding: 3px; gap: 2px; }
+.seg button { font: 600 13px/1 var(--font); background: transparent; color: var(--muted); border: 0; border-radius: 6px; padding: 7px 14px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--tint); color: #fff; }
+.table { display: flex; flex-wrap: wrap; gap: 28px 24px; justify-content: center; max-width: 1320px; margin: 0 auto; }
+.panel { display: flex; flex-direction: column; gap: 10px; width: 300px; max-width: 100%; }
+.panel > h2 { font: 600 13px/1.2 var(--font); color: var(--page-fg); margin: 0; letter-spacing: .08em; text-transform: uppercase; }
+.panel > h2 small { display: block; font: 400 13px/1.3 var(--font); color: var(--page-muted); text-transform: none; letter-spacing: 0; margin-top: 3px; }
+.panel > p { margin: 0; font-size: 13px; line-height: 1.45; color: var(--page-muted); }
+.panel code { font-size: 12px; color: var(--page-fg); }
+
+.win { background: var(--win); border: 1px solid var(--win-border); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.45); color: var(--text); font-size: 14px; display: flex; flex-direction: column; overflow: visible; height: 420px; width: 300px; position: relative; }
+.title { display: flex; align-items: center; gap: 8px; background: var(--tint-deep); padding: 10px 12px; border-radius: 12px 12px 0 0; }
+.title svg { width: 16px; height: 16px; fill: none; stroke: #fff; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; flex: 0 0 auto; }
+.title span.t { font-weight: 600; font-size: 15px; color: #fff; flex: 1; }
+.help { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.7); color: #fff; font: 700 12px/18px var(--font); text-align: center; background: none; cursor: help; position: relative; }
+.help:hover, .help.open { background: rgba(255,255,255,.2); }
+.tip { position: absolute; left: 50%; top: 28px; transform: translateX(-50%); width: 230px; background: #0e0f14; border: 1px solid var(--win-border); border-radius: 8px; padding: 10px 12px; font: 400 12.5px/1.45 var(--font); color: var(--page-fg); box-shadow: 0 8px 24px rgba(0,0,0,.5); z-index: 5; text-align: left; display: none; }
+.help.open .tip { display: block; }
+.tip b { color: var(--text); display: block; margin-bottom: 4px; }
+.tip li { margin: 0; }
+.tip ul { margin: 0; padding-left: 16px; }
+.cancel { background: rgba(255,255,255,.16); border: 0; color: #fff; font: 600 12px/1 var(--font); padding: 5px 9px; border-radius: 6px; cursor: pointer; }
+.close { background: none; border: 0; color: #fff; opacity: .8; font-size: 18px; line-height: 1; padding: 2px 6px; cursor: pointer; }
+.body { padding: 12px 12px 8px; display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; }
+.foot { display: flex; align-items: center; gap: 10px; padding: 4px 12px 12px; }
+.faction { text-align: center; color: var(--muted); font-size: 12.5px; padding-bottom: 10px; margin-top: -4px; }
+.sub { color: var(--muted); font-size: 13.5px; }
+.btn { font: 600 15px/1 var(--font); color: #fff; background: var(--tint); border: 0; border-radius: 8px; padding: 13px 14px; cursor: pointer; flex: 1; }
+.btn[disabled] { background: var(--disabled-bg); color: var(--disabled); cursor: default; }
+.list { list-style: none; margin: 0; padding: 4px; display: flex; flex-direction: column; gap: 2px; background: var(--row); border-radius: 8px; overflow-y: auto; min-height: 0; }
+.list li { display: flex; align-items: baseline; gap: 6px; padding: 5px 8px; border-radius: 6px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.list li .n { color: var(--muted); }
+.list li .name { flex: 1; min-width: 0; }
+.list li .tag { color: var(--muted); font-weight: 400; font-size: 13px; }
+.list li .v { color: var(--muted); }
+.list li.hi { background: var(--tint-deep); color: #fff; }
+.list li.hi .n, .list li.hi .tag, .list li.hi .v { color: #fff; }
+.list li.lo { background: var(--danger-deep); color: #fff; }
+.list li.lo .n, .list li.lo .tag, .list li.lo .v { color: #fff; }
+.list li.wait { color: var(--disabled); }
+.list li.wait .v { color: var(--disabled); font-style: italic; }
+.list li.total { border-top: 1px solid var(--row-border); border-radius: 0; margin-top: 2px; padding-top: 8px; color: var(--muted); }
+.list .m { color: var(--text); font-weight: 600; }
+.h { font-size: 12.5px; color: var(--muted); font-weight: 500; display: flex; justify-content: space-between; }
+.status { font-weight: 700; font-size: 14px; color: var(--tint-text); }
+.status.plain { color: var(--text); }
+.bar { height: 6px; background: var(--row); border-radius: 3px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: var(--w); background: var(--tint); border-radius: 3px; }
+.winner { padding: 6px 0 2px; display: flex; justify-content: space-between; align-items: flex-end; }
+.winner .l { display: block; font-size: 12.5px; color: var(--muted); font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
+.winner .name { display: block; font-size: 30px; font-weight: 700; color: var(--tint-text); line-height: 1.2; }
+.winner .roll { font-size: 30px; font-weight: 700; color: var(--tint-text); line-height: 1.2; }
+.owes { font-size: 15px; font-weight: 600; color: var(--text); }
+.owes .m { color: var(--tint-text); }
+
+.q { max-width: 1320px; margin: 36px auto 0; }
+.q h2 { font: 600 17px/1.3 var(--font); color: var(--text); margin: 0 0 4px; }
+.q .subtitle { color: var(--page-muted); font-size: 14px; margin: 0 0 14px; }
+.options { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.option { display: flex; gap: 12px; background: var(--win); border: 1px solid var(--win-border); border-radius: 10px; padding: 14px; cursor: pointer; }
+.option:hover { border-color: var(--muted); }
+.option.selected { border-color: var(--tint); background: #1a2238; }
+.option .letter { width: 28px; height: 28px; border-radius: 50%; background: var(--row); color: var(--text); font: 700 13px/28px var(--font); text-align: center; flex: 0 0 auto; }
+.option.selected .letter { background: var(--tint); color: #fff; }
+.option h3 { margin: 0 0 4px; font: 600 14px/1.3 var(--font); color: var(--text); }
+.option p { margin: 0; font-size: 13px; color: var(--page-muted); line-height: 1.45; }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+	<h1>One-round death roll: the window's three states</h1>
+	<div class="seg" role="group" aria-label="Faction tint">
+		<button type="button" aria-pressed="true" data-faction="alliance">Alliance</button>
+		<button type="button" aria-pressed="false" data-faction="horde">Horde</button>
+	</div>
+	<p>Same 300 by 420 window, same title bar, subtitle, list box, status line, bar and main button as today. New: the <b>?</b> in the title bar (click it here; in game it opens on hover), the list sorted by roll with the highest and lowest rows highlighted, and the result built around one debt.</p>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+	<symbol id="i-alliance" viewBox="0 0 24 24"><path d="M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3z"/></symbol>
+	<symbol id="i-horde" viewBox="0 0 24 24"><path d="M12 3c1 3 4 4 4 8a4 4 0 0 1-8 0c0-1 .3-2 1-3 0 2 1 3 2 3 0-3-1-5 1-8z"/><path d="M8 14a5 5 0 0 0 8 0"/></symbol>
+</svg>
+
+<div class="table">
+
+	<section class="panel">
+		<h2>1. Rolling <small>Everyone rolls once. 6 of 7 have rolled.</small></h2>
+		<div class="win">
+			<div class="title"><svg><use href="#i-alliance" class="ic"/></svg><span class="t">Death roll</span>
+				<button type="button" class="help" aria-label="How it works">?<div class="tip"><b>How it works</b><ul><li>Type <b style="display:inline">1</b> in chat to join.</li><li>When called, everyone types /roll 100 once.</li><li>Highest roll wins, lowest roll pays.</li><li>Owed = (highest − lowest) × wager ÷ 100.</li><li>Ties at the top or bottom re-roll.</li><li>No roll in time means you sat out.</li></ul></div></button>
+				<button type="button" class="cancel">Cancel</button></div>
+			<div class="body">
+				<div class="sub">Raid chat, 100g per person, roll 1-100</div>
+				<div class="h"><span>Rolled</span><span>6 of 7</span></div>
+				<ul class="list">
+					<li class="wait"><span class="name">Gina</span><span class="v">waiting</span></li>
+					<li class="hi"><span class="name">Alice <span class="tag">highest</span></span><span class="v">97</span></li>
+					<li class="lo"><span class="name">Dan <span class="tag">lowest</span></span><span class="v">8</span></li>
+					<li><span class="name">Bob</span><span class="v">61</span></li>
+					<li><span class="name">Carl</span><span class="v">23</span></li>
+					<li><span class="name">Eve <span class="tag">(you)</span></span><span class="v">55</span></li>
+					<li><span class="name">Frank</span><span class="v">40</span></li>
+				</ul>
+				<div class="status" style="margin-top:auto">Everyone: /roll 100</div>
+				<div class="bar"><i style="--w:62%"></i></div>
+			</div>
+			<div class="foot"><button type="button" class="btn">Roll 1-100</button></div>
+			<div class="faction">Alliance</div>
+		</div>
+		<p>Highest on top, lowest right under it, then the rest from both ends inward: next highest, next lowest, and so on. Players still to roll sit at the top, dimmed, so the call-out is easy; they drop into place when they roll. Roll is enabled until you have rolled, then gray. The bar is the 45 s window.</p>
+	</section>
+
+	<section class="panel">
+		<h2>2. Tie-break <small>Two share the top. Only they roll again.</small></h2>
+		<div class="win">
+			<div class="title"><svg><use href="#i-alliance" class="ic"/></svg><span class="t">Death roll</span><button type="button" class="help" aria-label="How it works">?<div class="tip"><b>How it works</b><ul><li>Type <b style="display:inline">1</b> in chat to join.</li><li>When called, everyone types /roll 100 once.</li><li>Highest roll wins, lowest roll pays.</li><li>Owed = (highest − lowest) × wager ÷ 100.</li><li>Ties at the top or bottom re-roll.</li><li>No roll in time means you sat out.</li></ul></div></button><button type="button" class="cancel">Cancel</button></div>
+			<div class="body">
+				<div class="sub">Raid chat, 100g per person, roll 1-100</div>
+				<div class="h"><span>Tie for highest</span><span>0 of 2</span></div>
+				<ul class="list">
+					<li class="hi"><span class="name">Alice <span class="tag">re-roll</span></span><span class="v">97</span></li>
+					<li class="hi"><span class="name">Eve <span class="tag">(you) re-roll</span></span><span class="v">97</span></li>
+					<li class="lo"><span class="name">Dan <span class="tag">lowest</span></span><span class="v">8</span></li>
+					<li><span class="name">Bob</span><span class="v">61</span></li>
+					<li><span class="name">Carl</span><span class="v">23</span></li>
+					<li><span class="name">Frank</span><span class="v">40</span></li>
+				</ul>
+				<div class="status" style="margin-top:auto">Alice, Eve: /roll 100 again</div>
+				<div class="bar"><i style="--w:90%"></i></div>
+			</div>
+			<div class="foot"><button type="button" class="btn">Roll 1-100</button></div>
+			<div class="faction">Alliance</div>
+		</div>
+		<p>The tied rows keep their tint and get a <code>re-roll</code> tag; the rest of the list stays put. Same for a tie at the bottom. The re-roll replaces the tied player's number.</p>
+	</section>
+
+	<section class="panel">
+		<h2>3. Result <small>Stays until Reset.</small></h2>
+		<div class="win">
+			<div class="title"><svg><use href="#i-alliance" class="ic"/></svg><span class="t">Death roll</span><button type="button" class="help" aria-label="How it works">?<div class="tip"><b>How it works</b><ul><li>Type <b style="display:inline">1</b> in chat to join.</li><li>When called, everyone types /roll 100 once.</li><li>Highest roll wins, lowest roll pays.</li><li>Owed = (highest − lowest) × wager ÷ 100.</li><li>Ties at the top or bottom re-roll.</li><li>No roll in time means you sat out.</li></ul></div></button><button type="button" class="close" aria-label="Close">×</button></div>
+			<div class="body">
+				<div class="sub">Raid chat, 100g per person, roll 1-100</div>
+				<div class="winner"><div><span class="l">Winner</span><span class="name">Alice</span></div><span class="roll">97</span></div>
+				<ul class="list">
+					<li class="hi"><span class="name">Alice</span><span class="v">97</span></li>
+					<li class="lo"><span class="name">Dan</span><span class="v">8</span></li>
+					<li><span class="name">Bob</span><span class="v">61</span></li>
+					<li><span class="name">Carl</span><span class="v">23</span></li>
+					<li><span class="name">Eve <span class="tag">(you)</span></span><span class="v">55</span></li>
+					<li><span class="name">Frank</span><span class="v">40</span></li>
+					<li class="wait"><span class="name">Gina</span><span class="v">sat out</span></li>
+					<li class="total"><span class="name owes">Dan owes Alice</span><span class="m">89g</span></li>
+				</ul>
+			</div>
+			<div class="foot"><button type="button" class="btn">Reset</button></div>
+			<div class="faction">Alliance</div>
+		</div>
+		<p>The winner block gains the winning roll on the right. The list is the final standings; the last row, where Total used to be, is the one debt: (97 − 8) × 100g ÷ 100 = 89g.</p>
+	</section>
+
+</div>
+
+</div>
+
+<script>
+(function () {
+	var root = document.documentElement;
+	var segs = document.querySelectorAll('.seg button');
+	var names = { alliance: 'Alliance', horde: 'Horde' };
+	segs.forEach(function (b) {
+		b.addEventListener('click', function () {
+			var f = b.getAttribute('data-faction');
+			root.setAttribute('data-faction', f);
+			segs.forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+			document.querySelectorAll('.ic').forEach(function (u) { u.setAttribute('href', '#i-' + f); });
+			document.querySelectorAll('.faction').forEach(function (e) { e.textContent = names[f]; });
+		});
+	});
+	document.querySelectorAll('.help').forEach(function (h) {
+		h.addEventListener('click', function (e) { e.stopPropagation(); h.classList.toggle('open'); });
+	});
+	if (typeof toggleSelect !== 'function') {
+		window.toggleSelect = function (el) {
+			el.parentNode.querySelectorAll('.option').forEach(function (o) { o.classList.toggle('selected', o === el); });
+		};
+	}
+})();
+</script>
+</body>
+</html>

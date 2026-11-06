@@ -1,6 +1,6 @@
 # 02 Chat parsing: join words, roll results, `/dr` arguments
 
-Status: v1 implemented. Last verified against code: 2026-11-05. Owns `src/Parse.lua`, `spec/Parse_spec.lua`.
+Status: draft v3 (v1 with the `rollMax` argument). Last verified against code: not yet. Owns `src/Parse.lua`, `spec/Parse_spec.lua`.
 
 ## Purpose and scope
 
@@ -52,16 +52,16 @@ Splits on runs of spaces after trimming. The first word, lower-cased, is
 2. `args[1]` is required and goes through `Money.Parse`; a failure returns
    `nil, Money.ERROR`. Missing returns `nil, Parse.USAGE`.
 3. `args[2]`, if present, must be an integer from 2 to 1,000,000; otherwise
-   `nil, Parse.FIRST_ROLL_ERROR`. Absent gives `startRoll = nil`.
+   `nil, Parse.ROLL_MAX_ERROR`. Absent gives `rollMax = nil`.
 4. A third argument returns `nil, Parse.USAGE`.
-5. Returns `{ channel = <"GUILD"|"PARTY"|"RAID">, wager = <copper>, startRoll = <n or nil> }`.
+5. Returns `{ channel = <"GUILD"|"PARTY"|"RAID">, wager = <copper>, rollMax = <n or nil> }`.
 
 ## Exact user-facing text
 
 | Where | Text |
 |-------|------|
-| `Parse.USAGE` | `Usage: /dr g|p|r <wager> [first roll]` |
-| `Parse.FIRST_ROLL_ERROR` | `First roll must be a whole number from 2 to 1000000` |
+| `Parse.USAGE` | `Usage: /dr g|p|r <wager> [roll max]` |
+| `Parse.ROLL_MAX_ERROR` | `Roll max must be a whole number from 2 to 1000000` |
 | Wager errors | `Money.ERROR` from 01-money |
 
 ## Interfaces
@@ -71,7 +71,7 @@ Implements [contracts.md section 5.2](../contracts.md#52-nsparse). Uses
 
 ## Files
 
-Creates `src/Parse.lua` and `spec/Parse_spec.lua`. The spec loads
+Edits `src/Parse.lua` and `spec/Parse_spec.lua` (v3: `startRoll` becomes `rollMax`, and the two constants are renamed and reworded). The spec loads
 `src/Money.lua` into the same `ns` before `src/Parse.lua`:
 `local ns = LoadAddonFile("src/Money.lua"); LoadAddonFile("src/Parse.lua", ns)`.
 
@@ -96,13 +96,13 @@ Creates `src/Parse.lua` and `spec/Parse_spec.lua`. The spec loads
 | AC-02-12 | `Command("  G   1G ")` | `{ name="g", args={"1G"} }` |
 | AC-02-13 | `Command("cancel")` | `{ name="cancel", args={} }` |
 | AC-02-14 | `Command("")`, `Command(nil)` | `{ name="", args={} }` |
-| AC-02-15 | `StartArgs("g", {"1g"})` | `{ channel="GUILD", wager=10000, startRoll=nil }` |
+| AC-02-15 | `StartArgs("g", {"1g"})` | `{ channel="GUILD", wager=10000, rollMax=nil }` |
 | AC-02-16 | `StartArgs("guild", {"1g"})`, `("p", {"50s"})`, `("party", ...)`, `("r", ...)`, `("raid", ...)` | channels `GUILD`, `PARTY`, `PARTY`, `RAID`, `RAID` |
-| AC-02-17 | `StartArgs("g", {"1g", "500"})` | `startRoll = 500` |
+| AC-02-17 | `StartArgs("g", {"1g", "500"})` | `rollMax = 500` |
 | AC-02-18 | `StartArgs("x", {"1g"})` | `nil, Parse.USAGE` |
 | AC-02-19 | `StartArgs("g", {})` | `nil, Parse.USAGE` |
 | AC-02-20 | `StartArgs("g", {"abc"})` | `nil, Money.ERROR` |
-| AC-02-21 | `StartArgs("g", {"1g", "1"})`, `("g", {"1g", "12.5"})`, `("g", {"1g", "abc"})`, `("g", {"1g", "1000001"})` | `nil, Parse.FIRST_ROLL_ERROR` |
+| AC-02-21 | `StartArgs("g", {"1g", "1"})`, `("g", {"1g", "12.5"})`, `("g", {"1g", "abc"})`, `("g", {"1g", "1000001"})` | `nil, Parse.ROLL_MAX_ERROR` |
 | AC-02-22 | `StartArgs("g", {"1g", "500", "extra"})` | `nil, Parse.USAGE` |
 
 ### In-game (manual)
