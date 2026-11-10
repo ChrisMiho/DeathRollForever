@@ -214,7 +214,7 @@ Run with two other characters in a party or raid.
 
 | ID | Do | Expect |
 |----|----|--------|
-| IG-15-01 | `Start` with `Raid`, `100g`, `100` | lobby: subtitle `Raid chat, 100g per person, roll 1-100`, a big `60` counting down, the bar shrinking, `Joined 0`, the status line with `1` tinted |
+| IG-15-01 | `Start` with `Raid`, `100g`, `100` | lobby: subtitle `Raid chat, 100g per person, roll 1-100`, a big `45` counting down, the bar shrinking, `Joined 0`, the status line with `1` tinted |
 | IG-15-02 | three players type `1`, you among them | the list fills in join order with `(you)` after your name, `Joined 3` |
 | IG-15-03 | watch the countdown reach 0 | the window switches to rolling: header `Rolled 0 of 3`, every row dimmed `waiting`, status `Everyone: /roll 100`, the bar full and shrinking, the button tinted `Roll 1-100` |
 | IG-15-04 | a player rolls | their row leaves the waiting group, shows the number, and is tinted as highest; `Rolled 1 of 3` |

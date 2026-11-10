@@ -85,7 +85,7 @@ describe("Rules", function()
 
 	describe("constants", function()
 		it("exposes DEFAULTS, COUNTDOWN, REMINDERS and MIN_PLAYERS from the contract", function()
-			assert.are.same({ rollMax = 100, joinTime = 60, rollTime = 45, joinWord = "1" }, Rules.DEFAULTS)
+			assert.are.same({ rollMax = 100, joinTime = 45, rollTime = 45, joinWord = "1" }, Rules.DEFAULTS)
 			assert.are.same({ 30, 15, 5 }, Rules.COUNTDOWN)
 			assert.are.same({ 20, 10, 5 }, Rules.REMINDERS)
 			assert.are.equal(2, Rules.MIN_PLAYERS)
@@ -795,6 +795,59 @@ describe("Rules", function()
 			assert.are.same({}, R(game, "Dan", 50, t + 92))
 			assert.are.same({}, Rules.Cancel(game, t + 93))
 			assert.is_false(Rules.IsLive(game))
+		end)
+	end)
+
+	describe("a solo game (New with players)", function()
+		local function soloOpts(players)
+			local o = copyOpts()
+			o.rollTime = 15
+			o.players = players
+			return o
+		end
+
+		it("AC-03-44 starts straight in the round with the players in", function()
+			local game, events = Rules.New(soloOpts({ "Alice", "Bob", "Carl" }), t0)
+			assert.are.equal("rolling", game.phase)
+			assert.are.same({ "Alice", "Bob", "Carl" }, game.joined)
+			assert.are.same({ "Alice", "Bob", "Carl" }, game.rollers)
+			assert.are.equal(1, game.round)
+			assert.are.equal(t0 + 15, game.rollDeadline)
+			assert.are.same({
+				{ type = "call", names = { "Alice", "Bob", "Carl" }, max = 100, seconds = 15 },
+			}, events)
+		end)
+
+		it("AC-03-44 copies the players list", function()
+			local players = { "Alice", "Bob" }
+			local game = Rules.New(soloOpts(players), t0)
+			table.insert(players, "Carl")
+			assert.are.same({ "Alice", "Bob" }, game.joined)
+			assert.are.same({ "Alice", "Bob" }, game.rollers)
+		end)
+
+		it("AC-03-45 raises on a bad players list", function()
+			for _, players in ipairs({ { "Alice" }, {}, { "Alice", "Alice" }, { "Alice", "" }, "Alice", { "Alice", 5 } }) do
+				assert.has_error(function()
+					Rules.New(soloOpts(players), t0)
+				end)
+			end
+		end)
+
+		it("AC-03-46 plays like any game: a no-show sits out", function()
+			local game = Rules.New(soloOpts({ "Alice", "Bob", "Carl" }), t0)
+			assert.are.same({ { type = "rolled", name = "Bob", roll = 90, waiting = 2 } }, R(game, "Bob", 90, t0 + 1))
+			assert.are.same({ { type = "rolled", name = "Carl", roll = 10, waiting = 1 } }, R(game, "Carl", 10, t0 + 2))
+			assert.are.same({
+				{ type = "satOut", names = { "Alice" } },
+				{ type = "winner", name = "Bob", loser = "Carl", high = 90, low = 10, owed = 800000 },
+			}, Rules.Tick(game, t0 + 15))
+		end)
+
+		it("AC-03-47 ignores joins", function()
+			local game = Rules.New(soloOpts({ "Alice", "Bob", "Carl" }), t0)
+			assert.are.same({}, Rules.Join(game, "Dan", t0))
+			assert.are.same({ "Alice", "Bob", "Carl" }, game.joined)
 		end)
 	end)
 end)

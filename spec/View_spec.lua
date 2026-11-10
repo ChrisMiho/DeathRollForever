@@ -6,6 +6,7 @@ describe("View", function()
 		local ns = LoadAddonFile("src/Money.lua")
 		LoadAddonFile("src/Parse.lua", ns)
 		LoadAddonFile("src/Rules.lua", ns)
+		LoadAddonFile("src/Solo.lua", ns)
 		LoadAddonFile("src/View.lua", ns)
 		View = ns.View
 		Money = ns.Money
@@ -43,6 +44,10 @@ describe("View", function()
 				assert.are.equal("party", View.ChatName("PARTY"))
 				assert.are.equal("raid", View.ChatName("RAID"))
 			end)
+
+			it("AC-06-07 a solo game is solo", function()
+				assert.are.equal("solo", View.ChatName("SOLO"))
+			end)
 		end)
 
 		describe("Subtitle", function()
@@ -57,6 +62,13 @@ describe("View", function()
 				assert.are.equal(
 					"Guild chat, 1g 50s 45c per person, roll 1-500",
 					View.Subtitle({ channel = "GUILD", wager = 15045, rollMax = 500 })
+				)
+			end)
+
+			it("AC-14-06 a solo game has no chat", function()
+				assert.are.equal(
+					"Solo, 1g per person, roll 1-100",
+					View.Subtitle({ channel = "SOLO", wager = 10000, rollMax = 100 })
 				)
 			end)
 		end)
@@ -147,6 +159,38 @@ describe("View", function()
 				assert.has_error(function()
 					View.StartOpts("WHISPER", "1g", "")
 				end)
+			end)
+
+			it("AC-07-08 solo with an empty or missing bot count gets 10 bots", function()
+				local expected = { channel = "SOLO", wager = 10000, bots = 10 }
+				assert.are.same(expected, View.StartOpts("SOLO", "1g", "", ""))
+				assert.are.same(expected, View.StartOpts("SOLO", "1g", "", nil))
+			end)
+
+			it("AC-07-09 solo takes 1 to 40 bots, trimmed", function()
+				assert.are.same(
+					{ channel = "SOLO", wager = 10000, rollMax = 1000, bots = 40 },
+					View.StartOpts("SOLO", "1g", "1000", " 40 ")
+				)
+				assert.are.equal(1, View.StartOpts("SOLO", "1g", "", "1").bots)
+			end)
+
+			it("AC-07-10 a bad bot count gives Solo.BOTS_ERROR", function()
+				for _, text in ipairs({ "0", "41", "2.5", "abc" }) do
+					local opts, err = View.StartOpts("SOLO", "1g", "", text)
+					assert.is_nil(opts)
+					assert.are.equal("Bots must be a whole number from 1 to 40", err)
+				end
+			end)
+
+			it("AC-07-11 the wager is checked before the bot count", function()
+				local opts, err = View.StartOpts("SOLO", "abc", "", "10")
+				assert.is_nil(opts)
+				assert.are.equal(Money.ERROR, err)
+			end)
+
+			it("AC-07-12 other chats ignore the bot count", function()
+				assert.are.same({ channel = "GUILD", wager = 10000 }, View.StartOpts("GUILD", "1g", "", "99"))
 			end)
 		end)
 	end)

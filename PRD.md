@@ -49,6 +49,7 @@ Non-goals
 | v1 | Host runs a whole game from chat: `/dr g 1g`, join by typing `1`, countdowns, shuffled order, calls that say what to type, 45 s turns with reminders and forfeit, winner line with who owes what | superseded by v3 |
 | v2 | The host's window: form, lobby, rolling and winner states, Roll and Cancel buttons, faction tint | [docs/prd/visual.md](docs/prd/visual.md) |
 | v3 | One-round rules: everyone rolls once, highest wins, lowest pays `(highest - lowest) x wager / roll max`; sat-outs, tie-breaks; the window redrawn; a `?` hover box; `/dr` opens the window | [docs/prd/functional.md](docs/prd/functional.md), [docs/prd/visual.md](docs/prd/visual.md) |
+| v3.1 | Solo games: you against 1 to 40 bots in the window, no chat, no group needed; for practice and for testing a release alone | [docs/prd/functional/06-solo.md](docs/prd/functional/06-solo.md) |
 | v4 | Sync: addon players see the window live, ROLL button, auto-roll if the client allows it | not yet written; notes in section 5 |
 | v5 | Ledger and trade detection: the debt marked paid, `/dr owed`, paid notices in chat | not yet written; notes in section 5 |
 | v6 | Settings, saved variables, history and stats, host resumes after `/reload` | not yet written; notes in section 5 |

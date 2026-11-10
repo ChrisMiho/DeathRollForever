@@ -11,7 +11,7 @@ local _, ns = ...
 local Rules = {}
 ns.Rules = Rules
 
-Rules.DEFAULTS = { rollMax = 100, joinTime = 60, rollTime = 45, joinWord = "1" }
+Rules.DEFAULTS = { rollMax = 100, joinTime = 45, rollTime = 45, joinWord = "1" }
 Rules.COUNTDOWN = { 30, 15, 5 } -- seconds left to join when a countdown line posts
 Rules.REMINDERS = { 20, 10, 5 } -- seconds left to roll when a reminder posts
 Rules.MIN_PLAYERS = 2 -- joined to close the lobby; rolled to settle a round
@@ -54,6 +54,21 @@ end
 local function checkType(value, expected, label)
 	if type(value) ~= expected then
 		error(("Rules: %s must be a %s, got %s"):format(label, expected, type(value)), 3)
+	end
+end
+
+-- opts.players for a solo game: at least MIN_PLAYERS different non-empty names.
+local function checkPlayers(players)
+	checkType(players, "table", "opts.players")
+	if #players < Rules.MIN_PLAYERS then
+		error(("Rules: opts.players needs at least %d names"):format(Rules.MIN_PLAYERS), 3)
+	end
+	local seen = {}
+	for _, name in ipairs(players) do
+		if type(name) ~= "string" or name == "" or seen[name] then
+			error("Rules: opts.players must be different non-empty names", 3)
+		end
+		seen[name] = true
 	end
 end
 
@@ -318,7 +333,16 @@ function Rules.New(opts, now)
 		endedAt = nil,
 		cancelReason = nil,
 	}
-	return game, { { type = "kickoff" } }
+	if opts.players == nil then
+		return game, { { type = "kickoff" } }
+	end
+	-- A solo game (06-solo): no lobby, the players are in and the roll is called.
+	checkPlayers(opts.players)
+	game.joined = copy(opts.players)
+	game.phase = "rolling"
+	game.rollers = copy(opts.players)
+	startRound(game, now, true)
+	return game, { callEvent(game) }
 end
 
 function Rules.Join(game, name, now) -- luacheck: no unused args

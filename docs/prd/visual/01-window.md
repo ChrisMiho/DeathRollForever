@@ -1,6 +1,6 @@
 # 01 Window: the frame, the corner, the hover box, moving, resizing, states
 
-Status: draft v3 (v2 shell plus the `?` hover box and the new subtitle). Last verified against code: not yet. Owns `src/UI.lua` (the shell), `src/View.lua` (`TINT`, `State`, `ChatName`, `Subtitle`, `Help`) and `spec/View_spec.lua` (their tests). Package 14, together with 02-form.
+Status: draft v3.1 (v2 shell plus the `?` hover box and the new subtitle; v3.1 adds the solo subtitle). Last verified against code: not yet. Owns `src/UI.lua` (the shell), `src/View.lua` (`TINT`, `State`, `ChatName`, `Subtitle`, `Help`) and `spec/View_spec.lua` (their tests). Package 14, together with 02-form.
 
 ## Purpose and scope
 
@@ -30,11 +30,15 @@ package merges.
 - `View.State(game)`: `"form"` when `game` is nil or `game.phase` is
   `"cancelled"`; `"lobby"`, `"rolling"` and `"winner"` for phases `lobby`,
   `rolling` and `finished`.
-- `View.ChatName(channel)`: `"guild"`, `"party"`, `"raid"` for `"GUILD"`,
-  `"PARTY"`, `"RAID"`.
+- `View.ChatName(channel)`: `"guild"`, `"party"`, `"raid"`, `"solo"` for
+  `"GUILD"`, `"PARTY"`, `"RAID"`, `"SOLO"`.
 - `View.Subtitle(game)`: `"<Chat> chat, <wager> per person, roll
   1-<rollMax>"`, with `<Chat>` capitalised (`Raid`) and `<wager>` from
-  `Money.Format`.
+  `Money.Format`. A solo game has no chat: `"Solo, <wager> per person, roll
+  1-<rollMax>"`.
+
+A solo game (06-solo) uses the same window, states and hover box as any
+game. It never shows the lobby: it starts in `rolling`.
 - `View.Help(joinWord, rollMax)`: the six lines of the hover box, in order,
   as plain strings with the join word and roll max filled in (the text
   table below).
@@ -42,7 +46,7 @@ package merges.
 ### The frame (`src/UI.lua`)
 
 Built once, on the first `UI.Show()` or the first Host change, whichever
-comes first (so `UnitFactionGroup` and `UnitName` are available, and a game
+comes first (so `UnitFactionGroup` and `GetUnitName` are available, and a game
 started from `/dr g` can show the window before any `/dr`), parented to
 `UIParent`, `DIALOG` strata, centred, clamped to the screen, sized and
 bounded as [visual.md 4.1](../visual.md#41-dimensions). `SetMovable(true)`
@@ -141,8 +145,9 @@ Triggers:
 - `UI.Show()` redraws once.
 
 A redraw while hidden is allowed and cheap; the window simply shows the
-right state when opened. When a game starts (the Host reports a game whose
-state is lobby) and the window is hidden, `redraw` calls `Show()`.
+right state when opened. When a game starts (the Host reports a live game:
+state lobby, or rolling for a solo game) and the window is hidden, `redraw`
+calls `Show()`.
 
 ## Exact user-facing text
 
@@ -156,14 +161,14 @@ state is lobby) and the window is hidden, `redraw` calls `Show()`.
 | corner, live game | `Cancel` |
 | footer | `Alliance`, `Horde` or `Neutral` |
 | main button | `Start`, `Roll`, `Roll 1-<max>`, `Reset` |
-| `View.Subtitle` | `Raid chat, 100g per person, roll 1-100` |
+| `View.Subtitle` | `Raid chat, 100g per person, roll 1-100`; solo: `Solo, 1g per person, roll 1-100` |
 
 ## Interfaces
 
 Implements contracts 5.6 (`TINT`, `State`, `ChatName`, `Subtitle`, `Help`)
 and 5.7. Uses `Host.OnChange`, `Host.Game`, `Host.Cancel`, `Money.Format`,
 `Rules.DEFAULTS`, `ns.Print`, and from section 7: `UIParent`,
-`CreateFrame`, `UnitFactionGroup`, `UnitName`, `Ambiguate`, `GetTime`,
+`CreateFrame`, `UnitFactionGroup`, `GetUnitName`, `Ambiguate`, `GetTime`,
 `GameTooltip`, the font objects, and the templates `BackdropTemplate` and
 `UIPanelScrollFrameTemplate` (the latter is set up here as a helper the
 state packages call to make a list box).
@@ -186,8 +191,10 @@ to `.luacheckrc` `read_globals`. One line in `CHANGELOG.md`.
 | AC-06-04 | `State({ phase = "rolling" })` | `"rolling"` |
 | AC-06-05 | `State({ phase = "finished" })` | `"winner"` |
 | AC-06-06 | `ChatName("GUILD")`, `("PARTY")`, `("RAID")` | `"guild"`, `"party"`, `"raid"` |
+| AC-06-07 | `ChatName("SOLO")` | `"solo"` |
 | AC-14-01 | `Subtitle({ channel = "RAID", wager = 1000000, rollMax = 100 })` | `"Raid chat, 100g per person, roll 1-100"` |
 | AC-14-02 | `Subtitle({ channel = "GUILD", wager = 15045, rollMax = 500 })` | `"Guild chat, 1g 50s 45c per person, roll 1-500"` |
+| AC-14-06 | `Subtitle({ channel = "SOLO", wager = 10000, rollMax = 100 })` | `"Solo, 1g per person, roll 1-100"` |
 | AC-14-03 | `TINT.Alliance` and `TINT.Horde` | each has `title`, `button`, `text`, `low`, every one a table of three numbers in 0..1 |
 | AC-14-04 | `Help("1", 100)` | the six lines of the text table, in order |
 | AC-14-05 | `Help("roll", 1000)` | line 1 `Type roll in chat to join.`, line 2 `When called, everyone types /roll 1000 once.`, line 4 `Owed: (highest - lowest) x wager / 1000.` |

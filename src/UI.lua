@@ -311,7 +311,8 @@ local function showHelp(button)
 end
 
 -- 02-form (package 14): the form. Chat, wager, roll max and the note; the
--- main button reads Start. Spec: docs/prd/visual/02-form.md.
+-- main button reads Start. v3.1: a Solo chat button and the Bots box.
+-- Spec: docs/prd/visual/02-form.md.
 
 -- Exact user-facing text of the form (02-form.md). The note's chat name and
 -- numbers come from View.ChatName and Rules.DEFAULTS; so does the roll max
@@ -324,12 +325,16 @@ local FORM_TEXT = {
 	rollMaxHint = "Everyone rolls 1 to this. 100 makes the gap a percentage.",
 	note = "Players join by typing %s in %s chat. %s s to join, %s s to roll.",
 	wagerDefault = "1g",
+	bots = "Bots",
+	botsHint = "1 to 40",
+	soloNote = "It's just you and the bots.",
 }
 
 local CHAT_BUTTONS = {
 	{ channel = "GUILD", label = "Guild" },
 	{ channel = "PARTY", label = "Party" },
 	{ channel = "RAID", label = "Raid" },
+	{ channel = "SOLO", label = "Solo" },
 }
 
 -- Sizes the shell has no name for.
@@ -340,6 +345,7 @@ local FORM_LAYOUT = {
 	boxArtLeft = 5, -- the template's left art sits this far left of the box
 	wagerLetters = 20,
 	rollMaxLetters = 7,
+	botsLetters = 2,
 }
 
 local form = {} -- the form's parts and its selected channel; filled by build.form
@@ -370,7 +376,8 @@ local function newEditBox(parent, maxLetters)
 	return box
 end
 
--- Selects a chat: paints the three buttons and rewrites the note.
+-- Selects a chat: paints the buttons, shows the Bots box for Solo only and
+-- rewrites the note.
 local function selectChat(channel)
 	form.channel = channel
 	for _, button in ipairs(form.chatButtons) do
@@ -379,6 +386,17 @@ local function selectChat(channel)
 		else
 			paintButton(button, PALETTE.box, lighten(PALETTE.box), PALETTE.muted)
 		end
+	end
+	for _, part in ipairs(form.botsParts) do
+		if channel == "SOLO" then
+			part:Show()
+		else
+			part:Hide()
+		end
+	end
+	if channel == "SOLO" then
+		form.note:SetText(FORM_TEXT.soloNote)
+		return
 	end
 	local defaults = ns.Rules.DEFAULTS
 	form.note:SetText(string.format(
@@ -406,7 +424,7 @@ function build.form(parent)
 	local gap = LAYOUT.gap
 	local labelGap = FORM_LAYOUT.labelGap
 
-	-- 1. Chat: three flat buttons in a box-coloured strip.
+	-- 1. Chat: four flat buttons in a box-coloured strip.
 	local chatLabel = newLabel(parent, FORM_TEXT.chat)
 	chatLabel:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, 0)
 
@@ -467,9 +485,22 @@ function build.form(parent)
 	rollMaxBox:SetPoint("RIGHT", parent, "RIGHT", 0, 0)
 	rollMaxBox:SetText(tostring(ns.Rules.DEFAULTS.rollMax))
 
-	newHint(parent, rollMaxBox, FORM_TEXT.rollMaxHint)
+	local rollMaxHint = newHint(parent, rollMaxBox, FORM_TEXT.rollMaxHint)
 
-	-- 4. The note, anchored above the main button.
+	-- 4. Bots: a numeric edit box with a hint under it, shown for Solo only.
+	local botsLabel = newLabel(parent, FORM_TEXT.bots)
+	botsLabel:SetPoint("TOPLEFT", rollMaxHint, "BOTTOMLEFT", 0, -gap)
+
+	local botsBox = newEditBox(parent, FORM_LAYOUT.botsLetters)
+	form.botsBox = botsBox
+	botsBox:SetNumeric(true)
+	botsBox:SetPoint("TOPLEFT", botsLabel, "BOTTOMLEFT", FORM_LAYOUT.boxArtLeft, -labelGap)
+	botsBox:SetPoint("RIGHT", parent, "RIGHT", 0, 0)
+	botsBox:SetText(tostring(ns.Solo.BOTS))
+
+	form.botsParts = { botsLabel, botsBox, newHint(parent, botsBox, FORM_TEXT.botsHint) }
+
+	-- 5. The note, anchored above the main button.
 	local note = parent:CreateFontString(nil, "OVERLAY")
 	form.note = note
 	note:SetFontObject(GameFontDisable)
@@ -487,9 +518,14 @@ function draw.form()
 	selectChat(form.channel)
 end
 
--- Start: what /dr g <wager> [roll max] does. Errors print through ns.Print.
+-- Start: what /dr g <wager> [roll max] (or /dr solo) does. Errors print through ns.Print.
 function onMain.form()
-	local opts, optsError = ns.View.StartOpts(form.channel, form.wagerBox:GetText(), form.rollMaxBox:GetText())
+	local opts, optsError = ns.View.StartOpts(
+		form.channel,
+		form.wagerBox:GetText(),
+		form.rollMaxBox:GetText(),
+		form.botsBox:GetText()
+	)
 	if not opts then
 		ns.Print(optsError)
 		return
@@ -852,14 +888,20 @@ function build.winner(parent)
 	local label = newText(parent, GameFontDisable, PALETTE.muted)
 	label:SetText(WINNER_TEXT.label)
 	label:SetPoint("TOPLEFT", winner.subtitle, "BOTTOMLEFT", 0, -gap)
+	-- Both hang from an invisible guide line under the label. The roll must
+	-- not anchor to the name: the name's right edge anchors to the roll, and
+	-- the client refuses that loop, which stopped the whole build here.
+	local line = CreateFrame("Frame", nil, parent)
+	line:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -WINNER_LAYOUT.labelGap)
+	line:SetPoint("RIGHT", parent, "RIGHT", 0, 0)
+	line:SetHeight(1)
 	winner.roll = newText(parent, GameFontNormalHuge, shell.tint.text)
 	winner.roll:SetJustifyH("RIGHT")
+	winner.roll:SetPoint("TOPRIGHT", line, "TOPRIGHT", 0, 0)
 	winner.name = newText(parent, GameFontNormalHuge, shell.tint.text)
-	winner.name:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -WINNER_LAYOUT.labelGap)
+	winner.name:SetPoint("TOPLEFT", line, "TOPLEFT", 0, 0)
 	winner.name:SetPoint("RIGHT", winner.roll, "LEFT", -WINNER_LAYOUT.rollGap, 0)
 	winner.name:SetJustifyH("LEFT")
-	winner.roll:SetPoint("TOP", winner.name, "TOP", 0, 0)
-	winner.roll:SetPoint("RIGHT", parent, "RIGHT", 0, 0)
 
 	-- 3. The list box, filling the room down to the main button.
 	winner.list = newListBox(parent)
@@ -882,7 +924,7 @@ function draw.winner(g)
 	paintDebt(rows[#model.rows + 1], model.debt)
 end
 
--- Builds the window once. Needs UnitFactionGroup and UnitName, so it runs on
+-- Builds the window once. Needs UnitFactionGroup and GetUnitName, so it runs on
 -- the first UI.Show() or the first Host change, never at file load.
 local function ensureBuilt()
 	if shell.window then
@@ -896,7 +938,7 @@ local function ensureBuilt()
 	end
 	shell.faction = faction
 	shell.tint = ns.View.TINT[faction or "Alliance"]
-	shell.host = Ambiguate(UnitName("player"), "short")
+	shell.host = Ambiguate(GetUnitName("player", true), "short") -- with the Forever surname, as rolls print it
 
 	local window = CreateFrame("Frame", nil, UIParent, "BackdropTemplate") -- [P0-TEMPLATES]
 	shell.window = window
@@ -1043,8 +1085,9 @@ function redraw(now)
 		shown = state
 	end
 	draw[state](game, now)
-	if state == "lobby" and not shell.window:IsShown() then
-		shell.window:Show() -- a game started while the window was hidden
+	local started = state == "lobby" or (state == "rolling" and game.channel == "SOLO")
+	if started and not shell.window:IsShown() then
+		shell.window:Show() -- a game started while the window was hidden (a solo game starts rolling)
 	end
 end
 

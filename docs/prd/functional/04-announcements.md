@@ -36,7 +36,7 @@ Every line starts with `[DeathRoll] `. Examples use wager 100g, roll max
 
 | Event | Line |
 |-------|------|
-| `kickoff` | `Death roll starting! 100g per person. Everyone rolls 1-100 once: highest wins, lowest pays the difference. Type 1 here to join. 60 seconds! Stay near the host so your rolls are seen.` |
+| `kickoff` | `Death roll starting! 100g per person. Everyone rolls 1-100 once: highest wins, lowest pays the difference. Type 1 here to join. 45 seconds! Stay near the host so your rolls are seen.` |
 | `countdown` | `30 seconds left to join! 4 in: Alice, Bob, Carl, Dan` |
 | `countdown`, nobody yet | `30 seconds left to join! 0 in` |
 | `closed` | `Joining closed! 5 players in: Alice, Bob, Carl, Dan, Eve` |
@@ -82,7 +82,7 @@ Fixture `game` as in 03's fixtures: wager 1000000, rollMax 100, joinWord
 
 | ID | Event | Expected single line (after the prefix) |
 |----|-------|------------------------------------------|
-| AC-04-01 | `kickoff` | `Death roll starting! 100g per person. Everyone rolls 1-100 once: highest wins, lowest pays the difference. Type 1 here to join. 60 seconds! Stay near the host so your rolls are seen.` |
+| AC-04-01 | `kickoff` | `Death roll starting! 100g per person. Everyone rolls 1-100 once: highest wins, lowest pays the difference. Type 1 here to join. 45 seconds! Stay near the host so your rolls are seen.` |
 | AC-04-02 | `kickoff` with wager 15045, rollMax 1000, joinWord "roll" | `Death roll starting! 1g 50s 45c per person. Everyone rolls 1-1000 once: highest wins, lowest pays the difference. Type roll here to join. 60 seconds! Stay near the host so your rolls are seen.` |
 | AC-04-03 | `countdown{secondsLeft=30, names={"Alice","Bob"}}` | `30 seconds left to join! 2 in: Alice, Bob` |
 | AC-04-04 | `countdown{secondsLeft=5, names={}}` | `5 seconds left to join! 0 in` |

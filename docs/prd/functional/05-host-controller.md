@@ -1,6 +1,6 @@
 # 05 Host controller: slash commands, chat in, lines out, the ticker
 
-Status: draft v3. Last verified against code: not yet. Owns `src/Host.lua`, `src/Init.lua`.
+Status: draft v3.1 (v3 plus solo games, see 06-solo). Last verified against code: not yet. Owns `src/Host.lua`, `src/Init.lua`.
 
 ## Purpose and scope
 
@@ -28,7 +28,7 @@ dispatches on `name`:
 | `name` | Action |
 |--------|--------|
 | `` (empty) | `ns.UI.Show()` |
-| `g`, `guild`, `p`, `party`, `r`, `raid` | `Parse.StartArgs(name, args)`; on error print it; else `Host.Start(result)`; on error print it |
+| `g`, `guild`, `p`, `party`, `r`, `raid`, `solo` | `Parse.StartArgs(name, args)`; on error print it; else `Host.Start(result)`; on error print it. A solo game opens the window by itself (01-window: a Host change shows a hidden window) |
 | `cancel` | `Host.Cancel()`; on error print it |
 | `help` | print the help lines |
 | anything else (`show` included) | print `Unknown command.` then the help lines |
@@ -41,22 +41,40 @@ loaded line ends with `Type /dr.`, which now opens the window.
 1. If `Host.IsHosting()`: return `nil, ALREADY_RUNNING`.
 2. Check membership: `GUILD` needs `IsInGuild()`, `PARTY` needs
    `IsInGroup()`, `RAID` needs `IsInRaid()`. Otherwise return `nil,
-   NOT_IN_<channel>`.
+   NOT_IN_<channel>`. `SOLO` needs nothing.
 3. Fill `opts.rollMax` from `Rules.DEFAULTS` when nil, and add `host =
-   Ambiguate(UnitName("player"), "short")`, `joinWord`, `joinTime`,
+   Ambiguate(GetUnitName("player", true), "short")` (the name with the
+   Forever surname, as roll lines print it `[P0-ROLL]`), `joinWord`, `joinTime`,
    `rollTime` from `Rules.DEFAULTS`.
+   For `SOLO`: `rollTime = Solo.ROLL_TIME`, and `opts.players =
+   Solo.Players(host, UnitFactionGroup("player"), opts.bots or Solo.BOTS,
+   math.random)`. `opts.bots` is dropped before `Rules.New`.
 4. `game, events = Rules.New(opts, GetTime())`. Keep `game` in a local.
 5. Register the chat events for that channel only (table in contracts
-   section 7) and `CHAT_MSG_SYSTEM`. Start `C_Timer.NewTicker(1, tick)`.
-   Post the events (below), so the listener sees a game whose ticker is
-   already running. Return `true`.
+   section 7; none for `SOLO`) and `CHAT_MSG_SYSTEM`. Start
+   `C_Timer.NewTicker(1, tick)`. Post the events (below), so the listener
+   sees a game whose ticker is already running. Return `true`.
 
 ### Post (internal)
 
 For each event in order, for each line of `Chat.Render(event, game)`:
-`SendChatMessage(line, game.channel)` `[P0-POST]`. Then call the
-`OnChange` listener with the game. Then, if `not Rules.IsLive(game)`: stop
-the ticker, unregister the chat events, drop the game.
+`SendChatMessage(line, game.channel)` `[P0-POST]`. A `SOLO` game sends
+nothing and prints nothing: no `Chat.Render`, no `SendChatMessage`, no
+`ns.Print`. Then, for a `SOLO` game, schedule the bots (below) if the list
+held a `call` or a `tieBreak`. Then call the `OnChange` listener with the
+game. Then, if `not Rules.IsLive(game)`: stop the ticker, unregister the
+chat events, drop the game.
+
+### Bot rolls (internal, `SOLO` only)
+
+`plan = Solo.Plan(game, host, math.random)`. For each `{ name, delay, roll
+}`: `C_Timer.After(delay, fn)` where `fn` checks that the game it was made
+for is still the hosted game (the same table) and still on the same
+`round`, and if so posts `Rules.Roll(game, name, roll, 1, game.rollMax,
+GetTime())`. A roll whose game was cancelled, finished or moved on to
+another round does nothing. The engine does the rest: the last roll
+settles the round, and a tie-break or an all-equal rerun starts a round
+that schedules the next bot rolls.
 
 ### Chat events
 
@@ -92,8 +110,14 @@ Stores `fn` in a local; a second call replaces the first. `Host` calls
   window redraws its countdown from this).
 
 `fn` is never called with `nil`, and never when `Host.Start` returned an
-error. Errors raised inside `fn` are not caught: a broken window breaks
-loudly in the host's own client, which is what we want during development.
+error. `fn` runs under `pcall`: an error inside it is printed to the host
+through `ns.Print` as `WINDOW_ERROR` with the error text, and the game goes
+on exactly as if the window had not been there. In particular a game that is
+no longer live is dropped whether or not `fn` raised, so the ticker never
+reports a finished or cancelled game again. (Before 0.3.0 errors were not
+caught, and an error while drawing the result left the host holding the
+finished game: its ticker handed the result to the window every second, so
+Reset flipped back to the winner view.)
 
 ### Leaving the chat
 
@@ -110,6 +134,7 @@ not handled; the host cancels. A later version may detect `GROUP_LEFT`.
 | `NOT_IN_PARTY` | `You are not in a party.` |
 | `NOT_IN_RAID` | `You are not in a raid.` |
 | `NOT_RUNNING` | `No game is running.` |
+| `WINDOW_ERROR` | `Window error (the game goes on in chat): <error text>` |
 | unknown command | `Unknown command.` followed by the help lines |
 
 Help lines, printed one per `ns.Print`:
@@ -119,6 +144,7 @@ Help lines, printed one per `ns.Print`:
 /dr g <wager> [roll max]     start in guild chat (1g, 50s, 1g50s, 1.5g)
 /dr p <wager> [roll max]     start in party chat
 /dr r <wager> [roll max]     start in raid chat
+/dr solo <wager> [roll max]  practise alone against 10 bots
 /dr cancel                   cancel the running game
 /dr help                     this list
 ```
@@ -134,8 +160,9 @@ section 7, every name of which goes into `.luacheckrc` `read_globals`.
 
 ## Files
 
-Edits `src/Host.lua` (`rollMax`, `rollTime`, the tick without `rng`) and
-`src/Init.lua` (the dispatch table and the help lines). No spec file: this
+Edits `src/Host.lua` (`rollMax`, `rollTime`, the tick without `rng`; v3.1:
+`SOLO` in `Start`, `post` and the bot rolls) and `src/Init.lua` (the
+dispatch table and the help lines; v3.1: `solo` and its help line). No spec file: this
 module is glue.
 
 ## Acceptance criteria
@@ -152,8 +179,8 @@ party with two alts on second accounts. Note what you see against each line.
 | ID | Do | Expect |
 |----|----|--------|
 | IG-05-01 | `/dr` | the window opens; nothing in your chat frame |
-| IG-05-02 | `/dr help` | the six help lines in your chat frame, `/dr` first; `/dr show` gives `Unknown command.` and the same six |
-| IG-05-03 | `/dr x 1g` | `Usage: /dr g|p|r <wager> [roll max]` locally |
+| IG-05-02 | `/dr help` | the seven help lines in your chat frame, `/dr` first, `/dr solo` after `/dr r`; `/dr show` gives `Unknown command.` and the same seven |
+| IG-05-03 | `/dr x 1g` | `Usage: /dr g|p|r|solo <wager> [roll max]` locally |
 | IG-05-04 | `/dr g abc` | `Enter an amount like 5, 1g 50s or 1.5g` locally |
 | IG-05-05 | `/dr g 1g 1` | `Roll max must be a whole number from 2 to 1000000` locally |
 | IG-05-06 | `/dr p 1g` while not in a party | `You are not in a party.` locally |
@@ -178,6 +205,17 @@ party with two alts on second accounts. Note what you see against each line.
 | IG-05-25 | a guild member far away and not grouped rolls | counts, or does not `[P0-DISTANCE]` |
 | IG-05-26 | `/dr r 50s` in a raid with players across the zone | works like guild; countdown and calls are seen by all |
 | IG-05-27 | `/reload` mid-game | the game is gone; `/dr cancel` says `No game is running.` (expected limitation) |
+
+Solo games (06-solo). These need no guild, no group and nobody else:
+
+| ID | Do | Expect |
+|----|----|--------|
+| IG-05-28 | not in a group, window closed: `/dr solo 1g` | the window opens straight on the round: you and 10 bots with names from your faction's list, `Rolled 0 of 11`, 15 seconds on the bar, `Solo, 1g per person, roll 1-100` under the title. Nothing in any chat and nothing in your chat frame |
+| IG-05-29 | watch for 5 seconds | every bot has rolled within 5 seconds of the start, at scattered moments, with no line or call per bot; the list sorts itself as they land |
+| IG-05-30 | click `Roll 1-100` (or type `/roll 100`) | your roll counts like a bot's; the result shows at once when you are the last |
+| IG-05-31 | `/dr solo 1g 2` a few times | ties almost every game: the tied bots re-roll on their own; when you are tied, you roll again yourself |
+| IG-05-32 | `/dr solo 1g`, do not roll | after 15 seconds you sit out and the result shows the bots only |
+| IG-05-33 | `/dr solo 1g`, then `/dr cancel` (or the window's `Cancel`) | the window goes back to the form; no bot roll arrives afterwards; nothing in chat. `/dr solo 1g` again starts a fresh game with new names |
 
 ## Mockup references
 

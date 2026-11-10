@@ -3,6 +3,7 @@ local _, ns = ...
 -- Host: the only glue besides the window. Feeds chat into the rules engine,
 -- posts every rendered line, and ticks the engine once a second while a game
 -- is live. No rules and no chat text of its own: those live in Rules and Chat.
+-- A solo game (06-solo) posts nothing and rolls for its bots on timers.
 -- Spec: docs/prd/functional/05-host-controller.md.
 
 local Host = {}
@@ -11,6 +12,7 @@ ns.Host = Host
 -- Local, host-only messages (returned as errorText; Init prints them).
 local ALREADY_RUNNING = "A game is already running. Type /dr cancel first."
 local NOT_RUNNING = "No game is running."
+local WINDOW_ERROR = "Window error (the game goes on in chat): %s"
 local NOT_IN = {
 	GUILD = "You are not in a guild.",
 	PARTY = "You are not in a party.",
@@ -23,6 +25,7 @@ local CHAT_EVENTS = {
 	GUILD = { "CHAT_MSG_GUILD" },
 	PARTY = { "CHAT_MSG_PARTY", "CHAT_MSG_PARTY_LEADER" },
 	RAID = { "CHAT_MSG_RAID", "CHAT_MSG_RAID_LEADER" },
+	SOLO = {}, -- nobody to hear: only the host's own /roll comes in
 }
 
 local game -- the running game, or nil
@@ -37,6 +40,8 @@ local function isMember(channel)
 		return IsInGroup()
 	elseif channel == "RAID" then
 		return IsInRaid()
+	elseif channel == "SOLO" then
+		return true
 	end
 	return false
 end
@@ -50,22 +55,60 @@ local function stop()
 	game = nil
 end
 
--- Post every rendered line of every event, in order, to the game's channel,
+local post
+
+-- A solo game: roll for every waiting bot at its own random moment. A timer
+-- whose game was dropped or has moved on to another round does nothing.
+local function scheduleBots()
+	local forGame, forRound = game, game.round
+	for _, bot in ipairs(ns.Solo.Plan(game, game.host, math.random)) do
+		C_Timer.After(bot.delay, function()
+			if game == forGame and game.round == forRound then
+				post(ns.Rules.Roll(game, bot.name, bot.roll, 1, game.rollMax, GetTime()))
+			end
+		end)
+	end
+end
+
+-- True when the list starts a round: the bots of a solo game must roll.
+local function startsRound(events)
+	for _, event in ipairs(events) do
+		if event.type == "call" or event.type == "tieBreak" then
+			return true
+		end
+	end
+	return false
+end
+
+-- Post every rendered line of every event, in order, to the game's channel
+-- (a solo game posts nothing but starts its bots' timers),
 -- then tell the listener. Once the game is no longer live, tear everything
 -- down; the listener has already seen the finished or cancelled game.
 -- post ends Start, tick and every chat or cancel path, so the listener runs
 -- at the end of each of them, even when a tick posted nothing (v2 section).
-local function post(events)
+-- An error inside the listener is caught and printed to the host, so a
+-- broken window can neither stall the chat game nor keep a dead game alive:
+-- the drop below runs whatever the listener did.
+function post(events)
 	if not game then
 		return
 	end
-	for _, event in ipairs(events) do
-		for _, line in ipairs(ns.Chat.Render(event, game)) do
-			SendChatMessage(line, game.channel) -- [P0-POST]
+	if game.channel == "SOLO" then
+		if startsRound(events) then
+			scheduleBots()
+		end
+	else
+		for _, event in ipairs(events) do
+			for _, line in ipairs(ns.Chat.Render(event, game)) do
+				SendChatMessage(line, game.channel) -- [P0-POST]
+			end
 		end
 	end
 	if listener then
-		listener(game)
+		local ok, err = pcall(listener, game)
+		if not ok then
+			ns.Print(WINDOW_ERROR:format(tostring(err)))
+		end
 	end
 	if not ns.Rules.IsLive(game) then
 		stop()
@@ -131,10 +174,15 @@ function Host.Start(opts)
 	if opts.rollMax == nil then
 		opts.rollMax = defaults.rollMax
 	end
-	opts.host = Ambiguate(UnitName("player"), "short")
+	opts.host = Ambiguate(GetUnitName("player", true), "short") -- with the Forever surname, as rolls print it
 	opts.joinWord = defaults.joinWord
 	opts.joinTime = defaults.joinTime
 	opts.rollTime = defaults.rollTime
+	if opts.channel == "SOLO" then
+		opts.rollTime = ns.Solo.ROLL_TIME
+		opts.players = ns.Solo.Players(opts.host, UnitFactionGroup("player"), opts.bots or ns.Solo.BOTS, math.random)
+	end
+	opts.bots = nil
 
 	local events
 	game, events = ns.Rules.New(opts, GetTime())

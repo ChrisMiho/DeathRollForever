@@ -16,9 +16,10 @@ Parse.CHANNELS = {
 	g = "GUILD", guild = "GUILD",
 	p = "PARTY", party = "PARTY",
 	r = "RAID", raid = "RAID",
+	solo = "SOLO", -- a solo game against bots (06-solo); no short form
 }
 
-Parse.USAGE = "Usage: /dr g|p|r <wager> [roll max]"
+Parse.USAGE = "Usage: /dr g|p|r|solo <wager> [roll max]"
 Parse.ROLL_MAX_ERROR = "Roll max must be a whole number from 2 to 1000000"
 
 local ROLL_MAX_MIN = 2

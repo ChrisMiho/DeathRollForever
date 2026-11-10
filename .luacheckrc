@@ -32,6 +32,7 @@ read_globals = {
 	"GameFontNormalLarge",
 	"GameTooltip",
 	"GetTime",
+	"GetUnitName",
 	"IsInGroup",
 	"IsInGuild",
 	"IsInRaid",
@@ -41,7 +42,6 @@ read_globals = {
 	"SendChatMessage",
 	"UIParent",
 	"UnitFactionGroup",
-	"UnitName",
 }
 
 files["spec/"] = {

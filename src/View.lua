@@ -48,6 +48,7 @@ local CHAT_NAME = {
 	GUILD = "guild",
 	PARTY = "party",
 	RAID = "raid",
+	SOLO = "solo",
 }
 
 -- "form" | "lobby" | "rolling" | "winner". nil or a cancelled game is "form".
@@ -62,11 +63,14 @@ function View.ChatName(channel)
 	return CHAT_NAME[channel]
 end
 
--- "Raid chat, 100g per person, roll 1-100"
+-- "Raid chat, 100g per person, roll 1-100"; a solo game has no chat: "Solo, ..."
 function View.Subtitle(game)
 	local chat = View.ChatName(game.channel)
 	chat = chat:sub(1, 1):upper() .. chat:sub(2)
-	return chat .. " chat, " .. ns.Money.Format(game.wager) .. " per person, roll 1-" .. game.rollMax
+	if game.channel ~= "SOLO" then
+		chat = chat .. " chat"
+	end
+	return chat .. ", " .. ns.Money.Format(game.wager) .. " per person, roll 1-" .. game.rollMax
 end
 
 -- The six lines of the hover box, in order, with the join word and roll max
@@ -88,23 +92,44 @@ local COMMAND_KEY = {
 	GUILD = "g",
 	PARTY = "p",
 	RAID = "r",
+	SOLO = "solo",
 }
 
--- The form's three inputs as the opts Parse.StartArgs returns:
+local function trim(text)
+	return (text or ""):match("^%s*(.-)%s*$")
+end
+
+-- The form's inputs as the opts Parse.StartArgs returns:
 -- { channel, wager, rollMax } or nil, errorText. The wager is passed whole
 -- (Money.Parse accepts "1g 50s"); the roll max is trimmed and left out when
--- empty. Any other channel is a programmer mistake.
-function View.StartOpts(channel, wagerText, rollMaxText)
+-- empty. A solo game also gets bots: empty is Solo.BOTS, else 1 to
+-- Solo.MAX_BOTS in digits. Any other channel is a programmer mistake.
+function View.StartOpts(channel, wagerText, rollMaxText, botsText)
 	local key = COMMAND_KEY[channel]
 	if not key then
 		error("StartOpts: unknown channel " .. tostring(channel), 2)
 	end
 	local args = { wagerText }
-	local rollMax = (rollMaxText or ""):match("^%s*(.-)%s*$")
+	local rollMax = trim(rollMaxText)
 	if rollMax ~= "" then
 		args[2] = rollMax
 	end
-	return ns.Parse.StartArgs(key, args)
+	local opts, err = ns.Parse.StartArgs(key, args)
+	if not opts or channel ~= "SOLO" then
+		return opts, err
+	end
+	local Solo = ns.Solo
+	local bots = trim(botsText)
+	if bots == "" then
+		opts.bots = Solo.BOTS
+		return opts
+	end
+	local count = bots:match("^%d+$") and tonumber(bots)
+	if not count or count < 1 or count > Solo.MAX_BOTS then
+		return nil, Solo.BOTS_ERROR
+	end
+	opts.bots = count
+	return opts
 end
 
 -- 03-in-progress (package 15): Lobby, Game.

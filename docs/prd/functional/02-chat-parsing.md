@@ -1,6 +1,6 @@
 # 02 Chat parsing: join words, roll results, `/dr` arguments
 
-Status: draft v3 (v1 with the `rollMax` argument). Last verified against code: not yet. Owns `src/Parse.lua`, `spec/Parse_spec.lua`.
+Status: draft v3.1 (v1 with the `rollMax` argument, plus `solo`). Last verified against code: not yet. Owns `src/Parse.lua`, `spec/Parse_spec.lua`.
 
 ## Purpose and scope
 
@@ -54,13 +54,16 @@ Splits on runs of spaces after trimming. The first word, lower-cased, is
 3. `args[2]`, if present, must be an integer from 2 to 1,000,000; otherwise
    `nil, Parse.ROLL_MAX_ERROR`. Absent gives `rollMax = nil`.
 4. A third argument returns `nil, Parse.USAGE`.
-5. Returns `{ channel = <"GUILD"|"PARTY"|"RAID">, wager = <copper>, rollMax = <n or nil> }`.
+5. Returns `{ channel = <"GUILD"|"PARTY"|"RAID"|"SOLO">, wager = <copper>, rollMax = <n or nil> }`.
+   `solo` (v3.1, 06-solo) takes the same arguments as the chats; the bot
+   count is not a command argument, so `/dr solo` always plays
+   `Solo.BOTS`.
 
 ## Exact user-facing text
 
 | Where | Text |
 |-------|------|
-| `Parse.USAGE` | `Usage: /dr g|p|r <wager> [roll max]` |
+| `Parse.USAGE` | `Usage: /dr g|p|r|solo <wager> [roll max]` |
 | `Parse.ROLL_MAX_ERROR` | `Roll max must be a whole number from 2 to 1000000` |
 | Wager errors | `Money.ERROR` from 01-money |
 
@@ -104,6 +107,8 @@ Edits `src/Parse.lua` and `spec/Parse_spec.lua` (v3: `startRoll` becomes `rollMa
 | AC-02-20 | `StartArgs("g", {"abc"})` | `nil, Money.ERROR` |
 | AC-02-21 | `StartArgs("g", {"1g", "1"})`, `("g", {"1g", "12.5"})`, `("g", {"1g", "abc"})`, `("g", {"1g", "1000001"})` | `nil, Parse.ROLL_MAX_ERROR` |
 | AC-02-22 | `StartArgs("g", {"1g", "500", "extra"})` | `nil, Parse.USAGE` |
+| AC-02-23 | `StartArgs("solo", {"1g"})`, `("solo", {"50s", "1000"})` | `{ channel="SOLO", wager=10000, rollMax=nil }`, `{ channel="SOLO", wager=5000, rollMax=1000 }` |
+| AC-02-24 | `StartArgs("s", {"1g"})`, `StartArgs("solo", {"1g", "100", "10"})` | `nil, Parse.USAGE` (no short form; no bot count) |
 
 ### In-game (manual)
 

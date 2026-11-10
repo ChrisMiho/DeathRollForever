@@ -24,6 +24,7 @@ local HELP = {
 	"/dr g <wager> [roll max]     start in guild chat (1g, 50s, 1g50s, 1.5g)",
 	"/dr p <wager> [roll max]     start in party chat",
 	"/dr r <wager> [roll max]     start in raid chat",
+	"/dr solo <wager> [roll max]  practise alone against 10 bots",
 	"/dr cancel                   cancel the running game",
 	"/dr help                     this list",
 }

@@ -8,7 +8,7 @@ criteria is in a sub-document under [functional/](functional/).
 
 One player, the host, has the addon. They type `/dr g 100g` in a guild (or
 `/dr p`, `/dr r` for party or raid), or fill in the window and click Start.
-The addon posts a kickoff line. Anyone who types `1` in that chat within 60
+The addon posts a kickoff line. Anyone who types `1` in that chat within 45
 seconds is in. The addon counts down, closes the lobby and tells everyone to
 `/roll 100`. Each player rolls once within 45 seconds, with reminders naming
 whoever has not rolled. Then the addon posts the result: the highest roll
@@ -52,7 +52,7 @@ The wager is per person and accepts the forms in
 host is not in that chat, a game is already running, or the arguments are
 bad, the host sees a local message and nothing is posted.
 
-The addon posts the kickoff line in that chat and starts a 60-second join
+The addon posts the kickoff line in that chat and starts a 45-second join
 window.
 
 ### 4.2 Lobby
@@ -118,6 +118,16 @@ message.
 - One game per host at a time. Minimum 2 players. The host does not have
   to play.
 
+### 4.8 Solo games (v3.1)
+
+Anyone can play alone against bots: `/dr solo <wager> [roll max]`, or
+`Solo` on the form with 1 to 40 bots (default 10). There is no join phase:
+the game starts with you and the bots in and the roll called. The addon
+rolls for every bot within 5 seconds of each round starting; you roll yourself. Rolls,
+sat-outs, tie-breaks and the result follow the rules above, with 15 seconds
+to roll. Nothing is posted to chat and nobody owes anything for real. Detail:
+[06-solo](functional/06-solo.md).
+
 ## 5. Commands (`/dr` or `/deathroll`)
 
 ```
@@ -125,6 +135,7 @@ message.
 /dr g 100g         start in guild chat, 100g per person, everyone rolls 1-100
 /dr p 50s          start in party chat, 50 silver per person
 /dr r 1g50s 1000   start in raid chat, 1g 50s per person, everyone rolls 1-1000
+/dr solo 1g        practise alone: you and 10 bots, in the window only
 /dr guild 1g       same as /dr g; party and raid likewise
 /dr cancel         host: cancel the game
 /dr help           list these
@@ -136,8 +147,9 @@ Detail and local messages: [05-host-controller](functional/05-host-controller.md
 
 | Setting | Value |
 |---------|-------|
-| Join time | 60 s, countdown lines at 30, 15, 5 |
-| Roll time | 45 s per round, reminders at 20, 10, 5, round ends at 0 |
+| Join time | 45 s, countdown lines at 30, 15, 5 |
+| Roll time | 45 s per round, reminders at 20, 10, 5, round ends at 0; 15 s in a solo game |
+| Bots in a solo game | 10, from 1 to 40 |
 | Roll max | 100 |
 | Join word | `1` |
 | Minimum players | 2 joined to start, 2 rolled to settle |
@@ -171,3 +183,7 @@ new check.
 | 2026-11-06 | An all-equal round is rerun | Nobody can win or lose on a gap of zero |
 | 2026-11-06 | Roll time 45 s with reminders naming who has not rolled | Same pace as the old turn; the names make the call-out easy |
 | 2026-11-06 | `/dr` opens the window; `/dr help` lists the commands | The host found `/dr show` awkward; the window is the common case |
+| 2026-11-10 | Solo games against bots, for everyone, in the window only | Testing needed a teammate every time; players can practise too. Posting a solo game to chat would only be noise |
+| 2026-11-10 | Solo has no join phase and 15 s to roll | Nobody to wait for; a test round takes seconds |
+| 2026-11-10 | Bots get fun faction names from a fixed list of 50 Horde and 50 Alliance | Clearly fake, and fun to read |
+| 2026-11-10 | Solo is a fourth chat button on the form, not a checkbox or a tab | It answers the same question as Guild, Party and Raid: where the game is played |

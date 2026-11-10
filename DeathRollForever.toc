@@ -10,6 +10,7 @@ embeds.xml
 src\Money.lua
 src\Parse.lua
 src\Rules.lua
+src\Solo.lua
 src\Chat.lua
 src\View.lua
 src\Host.lua

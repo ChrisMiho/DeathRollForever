@@ -1,6 +1,6 @@
 # 03 Rules engine
 
-Status: draft v3. Last verified against code: not yet. Owns `src/Rules.lua`, `spec/Rules_spec.lua`.
+Status: draft v3.1 (v3 plus solo games, see 06-solo). Last verified against code: not yet. Owns `src/Rules.lua`, `spec/Rules_spec.lua`.
 
 ## Purpose and scope
 
@@ -33,6 +33,16 @@ required; a missing or wrongly typed field raises. Returns a `game` in phase
 `countdownSent`, `rollers`, `rolls`, `tieRolls`, `history`, `satOut`,
 `remindersSent`, and `tie = nil`. The `kickoff` event is returned as a
 second value: `game, events`.
+
+**With `opts.players`** (a solo game, 06-solo): `players` is a list of at
+least `Rules.MIN_PLAYERS` names, all different, each a non-empty string;
+anything else raises. The game skips the lobby: `joined = copy(players)`,
+`phase = "rolling"`, `rollers = copy(players)`, then start the round
+(below, `round = 1`) and return `game, { call{names = copy(rollers), max =
+rollMax, seconds = rollTime} }`. No `kickoff`, no `joined`, no `closed`.
+`joinWord` and `joinTime` are still required and kept on the game, but
+nothing reads them: `joinDeadline` is `now + joinTime` and the lobby never
+runs. From here on the game is an ordinary game in phase `rolling`.
 
 ### `Rules.Join(game, name, now)`
 
@@ -240,6 +250,10 @@ roll, at)` is shorthand for `Roll(game, name, roll, 1, 100, at)`.
 | AC-03-40 | `Owed(97, 8, 1000000, 100)`, `Owed(90, 80, 1000000, 100)`, `Owed(5, 2, 10000, 1000)`, `Owed(50, 50, 10000, 100)` | `890000`, `100000`, `30`, `0` |
 | AC-03-41 | `Cancel` in lobby; `Cancel` in rolling; `Cancel` during a tie-break | each `{cancelled host}`, phase `cancelled` |
 | AC-03-42 | `IsLive` in lobby, rolling, finished, cancelled | `true`, `true`, `false`, `false` |
+| AC-03-44 | `New(opts with players={"Alice","Bob","Carl"}, rollTime=15, t0)` | phase `rolling`, `joined` and `rollers` `{"Alice","Bob","Carl"}`, `round == 1`, `rollDeadline == t0 + 15`, events `{ call{names={"Alice","Bob","Carl"}, max=100, seconds=15} }` |
+| AC-03-45 | `New` with `players={"Alice"}`, `{}`, `{"Alice","Alice"}`, `{"Alice", ""}`, `"Alice"` | each raises |
+| AC-03-46 | solo game of AC-03-44; `R(Bob, 90)`, `R(Carl, 10)`, then `Tick(t0 + 15)` | `{satOut{"Alice"}, winner{name=Bob, loser=Carl, high=90, low=10, owed=800000}}` |
+| AC-03-47 | solo game of AC-03-44; `Join(game, "Dan", t0)` | `{}`, `joined` unchanged |
 | AC-03-43 | Full scripted game: 5 players, a wrong range, a roll from a non-player, a second roll from the same player, one sat out, a high tie settled by a tie-break in which one of the tied does not roll | the exact event sequence, written out in the spec |
 
 ### In-game (manual)

@@ -29,8 +29,9 @@ describe("Parse", function()
 				g = "GUILD", guild = "GUILD",
 				p = "PARTY", party = "PARTY",
 				r = "RAID", raid = "RAID",
+				solo = "SOLO",
 			}, Parse.CHANNELS)
-			assert.are.equal("Usage: /dr g|p|r <wager> [roll max]", Parse.USAGE)
+			assert.are.equal("Usage: /dr g|p|r|solo <wager> [roll max]", Parse.USAGE)
 			assert.are.equal("Roll max must be a whole number from 2 to 1000000", Parse.ROLL_MAX_ERROR)
 		end)
 	end)
@@ -155,6 +156,20 @@ describe("Parse", function()
 
 		it("AC-02-22 rejects a third argument with the usage line", function()
 			assertStartError("g", { "1g", "500", "extra" }, Parse.USAGE)
+		end)
+
+		it("AC-02-23 solo takes a wager and an optional roll max", function()
+			assert.are.same({ channel = "SOLO", wager = 10000 }, Parse.StartArgs("solo", { "1g" }))
+			assert.are.same({ channel = "SOLO", wager = 5000, rollMax = 1000 }, Parse.StartArgs("solo", { "50s", "1000" }))
+		end)
+
+		it("AC-02-24 solo has no short form and no bot count", function()
+			assertStartError("s", { "1g" }, Parse.USAGE)
+			assertStartError("solo", { "1g", "100", "10" }, Parse.USAGE)
+		end)
+
+		it("the usage line names solo", function()
+			assert.are.equal("Usage: /dr g|p|r|solo <wager> [roll max]", Parse.USAGE)
 		end)
 
 		it("accepts the roll max bounds 2 and 1000000", function()

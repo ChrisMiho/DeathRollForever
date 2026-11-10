@@ -1,6 +1,6 @@
 # Contracts
 
-Status: draft v3 (one-round rules), on top of v1 and v2. Last verified against code: not yet.
+Status: draft v3.1 (one-round rules plus solo games), on top of v1 and v2. Last verified against code: not yet.
 
 Everything that parallel builders share. A builder reads this, their own
 feature document and `CLAUDE.md`, and nothing else. If a feature needs
@@ -13,7 +13,8 @@ This document covers **v3: the one-round death roll** played in the chat
 everyone rolls once, the highest roll wins and the lowest roll pays the
 difference. The module map, the glue and the window shell are unchanged;
 the `game` table, the `Rules` events and the rolling and winner views are
-new. Later versions add modules; section 8 sketches them so v3 does not
+new. v3.1 adds solo games: the host against bots, in the window only, with
+no chat (`ns.Solo`, the `"SOLO"` channel, `Rules.New` with `players`). Later versions add modules; section 8 sketches them so v3 does not
 paint them into a corner, but nothing there is a contract yet.
 
 ## 0. Phase 0 dependencies
@@ -23,7 +24,7 @@ them were answered during v1 and v2:
 
 | Tag | Check | Answer |
 |-----|-------|--------|
-| `[P0-ROLL]` | Exact text of the system message for `/roll` | `Name rolls N (1-M)` for everyone, never "You"; character names can contain a space, so the name capture is `(.-)`, not `(%S+)` |
+| `[P0-ROLL]` | Exact text of the system message for `/roll` | `Name rolls N (1-M)` for everyone, never "You". The name is the WoW Forever display name with the surname (`Forgot Shards`), so the capture is `(.-)`, not `(%S+)`. `UnitName("player")` leaves the surname out (`Forgot`); `GetUnitName("player", true)` and `UnitFullName("player")` include it (checked in game 2026-11-10) |
 | `[P0-POST]` | Addon code can post to guild, party and raid chat from a slash command and from a timer | Works in guild and party, direct and from a timer |
 | `[P0-DISTANCE]` | The host sees the roll of a far-away, ungrouped guild member | Not seen ungrouped, seen when grouped; the kickoff line tells players to stay near the host |
 | `[P0-AUTOROLL]` | Addon code can call `RandomRoll` from a timer | Works |
@@ -46,6 +47,7 @@ with busted. Glue modules may call the WoW API and are tested in game.
 | `ns.Parse` | `src/Parse.lua` | pure | [02-chat-parsing](functional/02-chat-parsing.md) |
 | `ns.Rules` | `src/Rules.lua` | pure | [03-rules-engine](functional/03-rules-engine.md) |
 | `ns.Chat` | `src/Chat.lua` | pure | [04-announcements](functional/04-announcements.md) |
+| `ns.Solo` | `src/Solo.lua` | pure | [06-solo](functional/06-solo.md) |
 | `ns.Host` | `src/Host.lua` | glue | [05-host-controller](functional/05-host-controller.md) |
 | `ns.version`, `ns.Print` | `src/Init.lua` | glue | [05-host-controller](functional/05-host-controller.md) |
 | `ns.View` | `src/View.lua` | pure | [visual/](visual/): 01 to 04, one section each |
@@ -61,6 +63,7 @@ embeds.xml
 src\Money.lua
 src\Parse.lua
 src\Rules.lua
+src\Solo.lua
 src\Chat.lua
 src\View.lua
 src\Host.lua
@@ -68,14 +71,14 @@ src\UI.lua
 src\Init.lua
 ```
 
-Unchanged in v3. A module may call another module only at run time (inside
+v3.1 adds `src\Solo.lua` after `src\Rules.lua`. A module may call another module only at run time (inside
 functions), never at file load, so load order only matters for `Init.lua`.
 
 ### Shared files and how to touch them
 
 | File | Rule |
 |------|------|
-| `DeathRollForever.toc` | Orchestrator only. Unchanged in v3 |
+| `DeathRollForever.toc` | Orchestrator only. v3.1 adds `src\Solo.lua` |
 | `src/Init.lua` | Owned by 05 |
 | `src/Host.lua` | Owned by 05 |
 | `src/View.lua`, `src/UI.lua`, `spec/View_spec.lua` | Shared by the four visual packages, which run one at a time. Each edits its own section and touches no other section |
@@ -93,10 +96,13 @@ functions), never at file load, so load order only matters for `Init.lua`.
 - **Money** is an integer number of copper. 1g = 10,000c, 1s = 100c.
 - **Time** is seconds as a float from `GetTime()`. Pure modules take `now` as
   a parameter; they never call a clock.
-- **Channels** are the strings `"GUILD"`, `"PARTY"`, `"RAID"`. These are also
-  the values `SendChatMessage` takes.
-- **No randomness** in the addon. v3 has no shuffle; every roll comes from
-  the players' `/roll`. `Rules` takes no `rng`.
+- **Channels** are the strings `"GUILD"`, `"PARTY"`, `"RAID"`, which are
+  also the values `SendChatMessage` takes, and `"SOLO"` for a solo game,
+  which is never passed to `SendChatMessage`: a solo game posts nothing.
+- **Randomness** only in solo games. Every roll of a real game comes from
+  the players' `/roll`, and `Rules` takes no `rng`. `ns.Solo` picks bot
+  names and bot rolls through an `rng(lo, hi)` parameter (a whole number
+  from `lo` to `hi`); `Host` passes `math.random`, tests pass a fake.
 - **Errors.** Pure functions that validate input return `nil, errorText`,
   where `errorText` is user-facing text without any prefix. They raise with
   `error` only for programmer mistakes (wrong types).
@@ -124,7 +130,7 @@ Defined on `ns.Rules`, used by Host, Chat and View. v3 has no settings; a
 later version replaces these with saved settings.
 
 ```lua
-Rules.DEFAULTS = { rollMax = 100, joinTime = 60, rollTime = 45, joinWord = "1" }
+Rules.DEFAULTS = { rollMax = 100, joinTime = 45, rollTime = 45, joinWord = "1" }
 Rules.COUNTDOWN = { 30, 15, 5 }      -- seconds left to join when a countdown line posts
 Rules.REMINDERS = { 20, 10, 5 }      -- seconds left to roll when a reminder posts
 Rules.MIN_PLAYERS = 2                -- joined to close the lobby; rolled to settle a round
@@ -142,18 +148,18 @@ functions. Kept in memory on the host and nowhere else.
 game = {
 	id          = "Alice-1762300000",   -- host .. "-" .. math.floor(now) at New
 	host        = "Alice",
-	channel     = "GUILD",              -- "GUILD" | "PARTY" | "RAID"
+	channel     = "GUILD",              -- "GUILD" | "PARTY" | "RAID" | "SOLO"
 	wager       = 1000000,              -- copper per person (100g)
 	rollMax     = 100,                  -- everyone types /roll 100
 	joinWord    = "1",
-	joinTime    = 60,
+	joinTime    = 45,
 	rollTime    = 45,
-	phase       = "lobby",              -- "lobby" | "rolling" | "finished" | "cancelled"
+	phase       = "lobby",              -- "lobby" | "rolling" | "finished" | "cancelled"; a solo game starts in "rolling"
 	createdAt   = 1762300000.5,         -- now at New
 
 	-- Lobby
-	joined      = { "Alice", "Bob", "Carl" },  -- join order; frozen at close
-	joinDeadline = 1762300060.5,        -- createdAt + joinTime
+	joined      = { "Alice", "Bob", "Carl" },  -- join order; frozen at close; a solo game's players, host first
+	joinDeadline = 1762300045.5,        -- createdAt + joinTime
 	countdownSent = {},                 -- { [30]=true, ... } markers already posted
 
 	-- Rolling. A game is one main round, then zero or more tie-break rounds.
@@ -231,8 +237,8 @@ Parse.Roll(systemMessage, pattern) -> name, roll, min, max | nil   -- pattern de
 Parse.Command(text)   -> { name = "g", args = { "1g", "500" } }     -- never fails; "" gives name ""
 Parse.StartArgs(name, args) -> { channel = "GUILD", wager = 10000, rollMax = 500 or nil } | nil, errorText
                                                -- rollMax is nil when not given; Host fills the default
-Parse.CHANNELS        = { g = "GUILD", guild = "GUILD", p = "PARTY", party = "PARTY", r = "RAID", raid = "RAID" }
-Parse.USAGE           = "Usage: /dr g|p|r <wager> [roll max]"
+Parse.CHANNELS        = { g = "GUILD", guild = "GUILD", p = "PARTY", party = "PARTY", r = "RAID", raid = "RAID", solo = "SOLO" }
+Parse.USAGE           = "Usage: /dr g|p|r|solo <wager> [roll max]"
 Parse.ROLL_MAX_ERROR  = "Roll max must be a whole number from 2 to 1000000"
 ```
 
@@ -243,8 +249,10 @@ Every function that takes a `game` mutates it and returns a list of events
 a second roll in the same round) returns an empty list and changes nothing.
 
 ```lua
-Rules.New(opts, now)                           -> game, events   -- events is { kickoff }
-   -- opts = { host, channel, wager, rollMax, joinWord, joinTime, rollTime }, all required
+Rules.New(opts, now)                           -> game, events   -- events is { kickoff }, or { call } with players
+   -- opts = { host, channel, wager, rollMax, joinWord, joinTime, rollTime }, all required,
+   -- and optional players = { names }: at least MIN_PLAYERS different names; the game skips
+   -- the lobby and starts in rolling with joined = players (solo games)
 Rules.Join(game, name, now)                    -> events   -- lobby only
 Rules.Tick(game, now)                          -> events   -- countdowns, close, reminders, a round settling on its deadline
 Rules.Roll(game, name, roll, min, max, now)    -> events   -- rolling only
@@ -272,6 +280,7 @@ Chat.Render(event, game) -> { line, ... }                -- prefixed chat lines 
 
 ```lua
 Host.Start(opts)      -> true | nil, errorText   -- opts from Parse.StartArgs or View.StartOpts; fills defaults
+                                                 -- opts.bots: bot count for a "SOLO" game, nil means Solo.BOTS
 Host.Cancel()         -> true | nil, errorText
 Host.IsHosting()      -> boolean
 Host.Game()           -> game | nil
@@ -292,10 +301,11 @@ View.TINT = {    -- 0..1 rgb. title: title bar, highest row; button: main button
 	Horde    = { title = { 0.490, 0.110, 0.110 }, button = { 0.831, 0.231, 0.231 }, text = { 1.000, 0.612, 0.612 }, low = { 0.420, 0.290, 0.102 } },
 }
 View.State(game)        -> "form" | "lobby" | "rolling" | "winner"   -- nil or a cancelled game gives "form"
-View.ChatName(channel)  -> "guild" | "party" | "raid"
-View.Subtitle(game)     -> "Raid chat, 100g per person, roll 1-100"
+View.ChatName(channel)  -> "guild" | "party" | "raid" | "solo"
+View.Subtitle(game)     -> "Raid chat, 100g per person, roll 1-100"   -- "Solo, 1g per person, roll 1-100" for SOLO
 View.Help(joinWord, rollMax) -> { line, ... }   -- the hover box, one string per line
-View.StartOpts(channel, wagerText, rollMaxText) -> opts | nil, errorText   -- what Parse.StartArgs returns
+View.StartOpts(channel, wagerText, rollMaxText, botsText) -> opts | nil, errorText
+                        -- what Parse.StartArgs returns; for SOLO also bots (botsText, empty = Solo.BOTS)
 View.Lobby(game, host, now)  -> { subtitle, secondsLeft, fraction, count, rows = { { n, name, you } }, status }
 View.Game(game, host, now)   -> { subtitle, header = { label, count }, rows = { { name, you, value, tag, mark } },
                                   status, secondsLeft, fraction, button = { label, enabled, max } }
@@ -323,6 +333,21 @@ UI.Hide()   -> nil   -- hides the window; does nothing while a game is live (lob
 
 The window registers `Host.OnChange` on `PLAYER_LOGIN` and redraws on every
 call. 01-window owns the rest of its behaviour, including the hover box.
+
+### 5.8 `ns.Solo` (pure)
+
+```lua
+Solo.BOTS        = 10
+Solo.MAX_BOTS    = 40
+Solo.ROLL_TIME   = 15                          -- seconds per round in a solo game
+Solo.BOTS_ERROR  = "Bots must be a whole number from 1 to 40"
+Solo.NAMES       = { Horde = { 50 names }, Alliance = { 50 names } }
+Solo.Players(host, faction, count, rng) -> { host, bot, ... }   -- count bots from faction's list, host first
+Solo.Plan(game, host, rng) -> { { name, delay, roll }, ... }   -- the waiting bots' rolls for the round just started
+```
+
+Owner: [06-solo](functional/06-solo.md), which has the names and the exact
+use of `rng`.
 
 ## 6. Events returned by `Rules`
 
@@ -360,10 +385,12 @@ be in `.luacheckrc` `read_globals`.
 | `CHAT_MSG_GUILD`, `CHAT_MSG_PARTY`, `CHAT_MSG_PARTY_LEADER`, `CHAT_MSG_RAID`, `CHAT_MSG_RAID_LEADER` | join words; only the game's channel is listened to |
 | `CHAT_MSG_SYSTEM` | roll results `[P0-ROLL]` `[P0-DISTANCE]` |
 | `Ambiguate(name, "short")` | stripping the realm from chat senders |
-| `UnitName("player")` | the host's own name |
+| `GetUnitName("player", true)` | the host's own name with the Forever surname, as roll lines print it `[P0-ROLL]`. Never `UnitName`: it leaves the surname out, and the host's own roll would not match |
 | `IsInGuild()`, `IsInGroup()`, `IsInRaid()` | refusing a start in a chat the host is not in |
 | `GetTime()` | `now` |
 | `C_Timer.NewTicker(1, fn)` | the 1-second tick while a game is live |
+| `C_Timer.After(seconds, fn)` | a bot's roll in a solo game |
+| `UnitFactionGroup("player")` | which bot names a solo game uses `[P0-FACTION]` |
 
 Used by `src/UI.lua` only:
 
@@ -372,14 +399,14 @@ Used by `src/UI.lua` only:
 | `UIParent` | parent of the window |
 | `CreateFrame` with the templates `BackdropTemplate`, `InputBoxTemplate`, `UIPanelScrollFrameTemplate` (strings, not globals) | the window, edit boxes, list boxes `[P0-TEMPLATES]` |
 | `UnitFactionGroup("player")` | the tint and the footer `[P0-FACTION]` |
-| `UnitName("player")`, `Ambiguate` | the host's name, for `(you)` and the host's own roll |
+| `GetUnitName("player", true)`, `Ambiguate` | the host's name, for `(you)` and the host's own roll |
 | `RandomRoll(1, max)` | the Roll button `[P0-CLICKROLL]` |
 | `GetTime()` | `now` for every draw |
 | `PLAYER_LOGIN` | registering the `Host.OnChange` listener |
 | `GameTooltip` | the hover box under the `?` in the title bar |
 | `GameFontNormalLarge`, `GameFontHighlight`, `GameFontDisable`, `GameFontNormalHuge`, `NumberFontNormalHuge` | font objects (visual.md 4.3) |
 
-`math.random` is no longer used anywhere. Frame methods (`SetResizeBounds`,
+`math.random` is used only by `Host`, as the `rng` it passes to `ns.Solo`. Frame methods (`SetResizeBounds`,
 `StartSizing`, `SetColorTexture`, ...) are not globals and need no
 `.luacheckrc` entry.
 
@@ -403,7 +430,9 @@ decisions do not block them.
 |------|---------|
 | Host | The player whose addon runs the game. Source of truth |
 | Player | Anyone who joined. Nobody but the host needs the addon |
-| Channel | The chat the game runs in: guild, party or raid |
+| Channel | The chat the game runs in: guild, party or raid; `SOLO` for a solo game, which has none |
+| Solo game | A game of the host against bots, in the window only. No lobby, nothing posted |
+| Bot | A made-up player in a solo game; the addon rolls for it |
 | Join word | The text a player types in that chat to join; `1` |
 | Roll max | The top of the range everyone rolls: `/roll 100`. Default 100 |
 | Round | One call to roll and the window that follows. The main round is everyone; a tie-break round is the tied players |
