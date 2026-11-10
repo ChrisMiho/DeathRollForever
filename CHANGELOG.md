@@ -5,11 +5,19 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-10
+
+Practise alone: `/dr solo 1g` (or `Solo` on the form) plays you against
+bots, right in the window, with no guild or group needed. This release also
+fixes the result view, which never showed the standings and made Reset
+misbehave, and makes the host's own roll count for characters with a
+surname.
+
 ### Added
 - Solo games: play alone against bots, no guild or group needed. Type `/dr solo <wager> [roll max]` (10 bots) or pick `Solo` on the form and set `Bots` from 1 to 40. There is no join phase: you and the bots are in at once, every bot rolls within 5 seconds, you have 15 seconds to roll, and ties re-roll like a normal game. Bots get fun names from your faction (50 Horde, 50 Alliance). Nothing is posted to any chat; it all happens in the window.
 
 ### Fixed
-- Rolls: the host's own roll counts again for characters with a surname. The addon read the host's name without the surname (`Forgot`) while the roll line has it (`Forgot Shards`), so the host's roll was ignored and the host sat out; the window now also shows the full name.
+- Rolls: the host's own roll now counts for characters with a surname. The addon read the host's name without the surname (`Forgot`) while the roll line has it (`Forgot Shards`), so the host's roll was ignored and the host sat out; the window now also shows the full name.
 - Window: the result view is built again. Its winner name and roll were anchored to each other, which the client refuses, so building the window stopped there: the result had no standings or debt row, the window had no resize grip and the bars did not move smoothly, and every result printed `attempt to index field 'list'`.
 - Host: an error inside the window no longer leaves the host holding a finished game, which made Reset flip back to the winner view every second; the error is now printed to the host's chat frame as `Window error (the game goes on in chat): ...` and the chat game carries on.
 
