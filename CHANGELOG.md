@@ -5,6 +5,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-11
+
+A clean-up release. Players with a Forever surname now always play in guild,
+party and raid games, and show with their surname. A wrong-range roll is
+whispered to that player instead of posted in chat. Big games swap long name
+lists for a count. When nobody tied for lowest rolls the tie-break, they all
+pay the winner instead of the game cancelling.
+
 ### Changed
 - Rules: when nobody tied for lowest rolls the tie-break, the game no longer cancels: they all pay, each owing the winner the full amount. The result line says `Bob and Carl rolled 8, skipped the tie-break and each owe Alice 89g.` and the window shows one debt row per loser. A tie for highest that nobody rolls still cancels, and its line now says `Nobody rolled the tie for highest. Game cancelled.`
 - Announcements: a roll in the wrong range is whispered to that player (`Wrong range, that roll does not count. Type /roll 100`) instead of posted in the game's chat.
