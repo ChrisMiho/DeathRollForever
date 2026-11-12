@@ -38,7 +38,7 @@ local _, ns = ...
 --     { name, you, value, tag, mark } draws the name, the tag, (you) and the
 --     value painted by mark ("", "high", "low", "waiting", "out"). 03 uses it
 --     for the lobby and the rolling list; 04 reuses it for the standings and
---     the debt row of the result.
+--     the debt rows of the result.
 --
 --   shell: the built parts. shell.host (the host's short name), shell.faction
 --     ("Alliance", "Horde" or nil for neutral), shell.tint (View.TINT entry),
@@ -139,6 +139,12 @@ local onMain = {
 }
 
 local redraw -- defined after the parts it needs
+
+-- A state with a game in progress: the corner reads Cancel and the window
+-- will not hide.
+local function isLive(state)
+	return state == "lobby" or state == "rolling"
+end
 
 local function lighten(colour)
 	return {
@@ -835,11 +841,11 @@ end
 
 
 -- 04-winner (package 16): the result until Reset. The winner and their roll,
--- the final standings and the one debt; the main button reads Reset and 01
+-- the final standings and the debts; the main button reads Reset and 01
 -- handles the click (onMain.winner below). Spec: docs/prd/visual/04-winner.md.
 
 -- Exact user-facing text of the winner state (04-winner.md). The winner's
--- name and roll, the row values and the debt come from View.Result.
+-- name and roll, the row values and the debts come from View.Result.
 local WINNER_TEXT = {
 	label = "WINNER",
 }
@@ -854,7 +860,7 @@ local winner = {} -- the winner's parts; filled by build.winner
 
 -- A row of the result list: a standings row (03's newRow, painted by
 -- paintRow) with a 1 px line along its top in the border colour that only
--- the debt row shows. Rows are created by box:Layout on the first draw that
+-- the first debt row shows. Rows are created by box:Layout on the first draw that
 -- needs them and reused, so every draw sets every field.
 local function newWinnerRow(parent)
 	local row = newRow(parent)
@@ -866,14 +872,18 @@ local function newWinnerRow(parent)
 	return row
 end
 
--- The last row: the debt text at the left with (you) after it when the host
--- is the loser, the amount right-aligned, both in text colour, and the line
--- above. Painted as a plain standings row, then the amount's colour and the
--- line set on top.
-local function paintDebt(row, debt)
+-- A debt row: the debt text at the left with (you) after it when the host
+-- is that loser, the amount right-aligned, both in text colour, and the line
+-- above the first debt only. Painted as a plain standings row, then the
+-- amount's colour and the line set on top.
+local function paintDebt(row, debt, first)
 	paintRow(row, { name = debt.text, you = debt.you, value = debt.amount, mark = "" })
 	row.value:SetTextColor(unpack(PALETTE.text))
-	row.line:Show()
+	if first then
+		row.line:Show()
+	else
+		row.line:Hide()
+	end
 end
 
 function build.winner(parent)
@@ -909,19 +919,22 @@ function build.winner(parent)
 	winner.list.frame:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
 end
 
--- The standings painted by mark, then the debt as the last row of the same
--- list.
+-- The standings painted by mark, then the debts as the last rows of the
+-- same list.
 function draw.winner(g)
 	local model = ns.View.Result(g, shell.host)
 	winner.subtitle:SetText(model.subtitle)
 	winner.name:SetText(model.winner)
 	winner.roll:SetText(model.winningRoll)
-	local rows = winner.list:Layout(#model.rows + 1, newWinnerRow)
+	local standings = #model.rows
+	local rows = winner.list:Layout(standings + #model.debts, newWinnerRow)
 	for i, row in ipairs(model.rows) do
 		paintRow(rows[i], row)
 		rows[i].line:Hide()
 	end
-	paintDebt(rows[#model.rows + 1], model.debt)
+	for i, debt in ipairs(model.debts) do
+		paintDebt(rows[standings + i], debt, i == 1)
+	end
 end
 
 -- Builds the window once. Needs UnitFactionGroup and GetUnitName, so it runs on
@@ -938,7 +951,7 @@ local function ensureBuilt()
 	end
 	shell.faction = faction
 	shell.tint = ns.View.TINT[faction or "Alliance"]
-	shell.host = Ambiguate(GetUnitName("player", true), "short") -- with the Forever surname, as rolls print it
+	shell.host = ns.Host.PlayerName()
 
 	local window = CreateFrame("Frame", nil, UIParent, "BackdropTemplate") -- [P0-TEMPLATES]
 	shell.window = window
@@ -1059,7 +1072,7 @@ local function ensureBuilt()
 	-- bars move smoothly. OnUpdate only runs while the window is shown.
 	local sinceRedraw = 0
 	window:SetScript("OnUpdate", function(_, elapsed)
-		if shown ~= "lobby" and shown ~= "rolling" then
+		if not isLive(shown) then
 			return
 		end
 		sinceRedraw = sinceRedraw + elapsed
@@ -1080,7 +1093,7 @@ function redraw(now)
 			frame:Hide()
 		end
 		shell.content[state]:Show()
-		setCorner(state ~= "form" and state ~= "winner")
+		setCorner(isLive(state))
 		setMainButton(MAIN[state].label, MAIN[state].enabled)
 		shown = state
 	end
@@ -1104,8 +1117,7 @@ end
 
 -- Does nothing while a game is live (lobby or rolling).
 function UI.Hide()
-	local state = ns.View.State(game)
-	if state ~= "form" and state ~= "winner" then
+	if isLive(ns.View.State(game)) then
 		return
 	end
 	if shell.window then

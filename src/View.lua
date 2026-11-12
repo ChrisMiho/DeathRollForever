@@ -174,7 +174,7 @@ function View.Lobby(game, host, now)
 	local secondsLeft, fraction = timeLeft(game.joinDeadline, now, game.joinTime)
 	local rows = {}
 	for i, name in ipairs(game.joined) do
-		rows[i] = { n = i, name = name, you = (name == host) }
+		rows[i] = { n = i, name = ns.Rules.FullName(game, name), you = (name == host) }
 	end
 	return {
 		subtitle = View.Subtitle(game),
@@ -215,7 +215,7 @@ end
 -- row groups 2 to 5, and 04-winner's Result as the final standings):
 --   2. highest: the current tie-break's high side, else the winner once
 --      decided, else everyone on the largest roll, in joined order;
---   3. lowest: the tie-break's low side, else the loser once decided, else
+--   3. lowest: the tie-break's low side, else the losers once decided, else
 --      everyone on the smallest roll who is not already highest;
 --   4. the rest: everyone else in game.rolls, sorted highest first (ties in
 --      joined order) and fanned out from both ends;
@@ -257,8 +257,8 @@ local function standings(game, host)
 	local lowest
 	if tie.low then
 		lowest = tie.low
-	elseif game.loser then
-		lowest = { game.loser }
+	elseif game.losers then
+		lowest = game.losers
 	else
 		lowest = onRoll(low, highest)
 	end
@@ -284,7 +284,8 @@ local function standings(game, host)
 	local function add(names, mark, value)
 		for _, name in ipairs(names) do
 			rows[#rows + 1] = {
-				name = name,
+				key = name, -- the character name; Game reads it for the tag, then drops it
+				name = ns.Rules.FullName(game, name),
 				you = (name == host),
 				value = value or tostring(rolls[name]),
 				mark = mark,
@@ -305,8 +306,8 @@ local function roundTag(game, row)
 		return ""
 	end
 	local tie = game.tie
-	if tie and (contains(tie.high, row.name) or contains(tie.low, row.name)) then
-		local reroll = game.tieRolls[row.name]
+	if tie and (contains(tie.high, row.key) or contains(tie.low, row.key)) then
+		local reroll = game.tieRolls[row.key]
 		if reroll ~= nil then
 			return TAG_REROLLED:format(reroll)
 		end
@@ -336,7 +337,11 @@ end
 
 local function roundStatus(game)
 	if game.tie then
-		return STATUS_TIE:format(table.concat(game.rollers, ", "), game.rollMax)
+		local shown = {}
+		for i, name in ipairs(game.rollers) do
+			shown[i] = ns.Rules.FullName(game, name)
+		end
+		return STATUS_TIE:format(table.concat(shown, ", "), game.rollMax)
 	end
 	if game.round > 1 then
 		return STATUS_EVERYONE_AGAIN:format(game.rollMax)
@@ -354,11 +359,18 @@ function View.Game(game, host, now)
 	local rows = {}
 	if not game.tie then
 		for _, name in ipairs(waiting) do
-			rows[#rows + 1] = { name = name, you = (name == host), value = VALUE_WAITING, tag = "", mark = "waiting" }
+			rows[#rows + 1] = {
+				name = ns.Rules.FullName(game, name),
+				you = (name == host),
+				value = VALUE_WAITING,
+				tag = "",
+				mark = "waiting",
+			}
 		end
 	end
 	for _, row in ipairs(standings(game, host)) do
 		row.tag = roundTag(game, row)
+		row.key = nil
 		rows[#rows + 1] = row
 	end
 
@@ -385,21 +397,32 @@ end
 -- Exact user-facing text of the winner state (04-winner.md).
 local DEBT_TEXT = "%s owes %s"
 
--- The result: the winner and their roll, the final standings and the one
--- debt. The rows are the standings above (the winner highest, the loser
--- lowest, the rest fanned out, the sat out last); the debt is what the loser
--- owes the winner, marked (you) when the host is the loser.
+-- The result: the winner and their roll, the final standings and the
+-- debts. The rows are the standings above (the winner highest, the losers
+-- lowest, the rest fanned out, the sat out last); each debt is what one
+-- loser owes the winner, in the losers' order, marked (you) when the host is
+-- that loser. Usually one; several when everyone tied for lowest skipped the
+-- tie-break.
 function View.Result(game, host)
 	checkPhase(game, "finished", "Result")
+	local rows = standings(game, host)
+	for _, row in ipairs(rows) do
+		row.key = nil
+	end
+	local amount = ns.Money.Format(game.owed)
+	local debts = {}
+	for i, loser in ipairs(game.losers) do
+		debts[i] = {
+			text = DEBT_TEXT:format(ns.Rules.FullName(game, loser), ns.Rules.FullName(game, game.winner)),
+			you = (loser == host),
+			amount = amount,
+		}
+	end
 	return {
 		subtitle = View.Subtitle(game),
-		winner = game.winner,
+		winner = ns.Rules.FullName(game, game.winner),
 		winningRoll = tostring(game.high),
-		rows = standings(game, host),
-		debt = {
-			text = DEBT_TEXT:format(game.loser, game.winner),
-			you = (game.loser == host),
-			amount = ns.Money.Format(game.owed),
-		},
+		rows = rows,
+		debts = debts,
 	}
 end

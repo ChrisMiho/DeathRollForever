@@ -1,6 +1,6 @@
 # 03 Rules engine
 
-Status: draft v3.1 (v3 plus solo games, see 06-solo). Last verified against code: not yet. Owns `src/Rules.lua`, `spec/Rules_spec.lua`.
+Status: draft v3.1 (v3 plus solo games, see 06-solo; `losers` and the low-side no-show rule 2026-11-11). Last verified against code: not yet. Owns `src/Rules.lua`, `spec/Rules_spec.lua`.
 
 ## Purpose and scope
 
@@ -12,7 +12,8 @@ reads a clock and never rolls anything. Pure Lua, no WoW API.
 
 v3 is one round: everyone rolls once, the highest roll wins, the lowest
 roll pays the difference. Ties for highest or lowest are settled by
-tie-break rounds among the tied players only.
+tie-break rounds among the tied players only. When nobody tied for lowest
+rolls the tie-break, they all pay.
 
 Out of scope: text (04), posting and timing (05), kick, extend, settings.
 
@@ -44,10 +45,22 @@ rollMax, seconds = rollTime} }`. No `kickoff`, no `joined`, no `closed`.
 nothing reads them: `joinDeadline` is `now + joinTime` and the lobby never
 runs. From here on the game is an ordinary game in phase `rolling`.
 
-### `Rules.Join(game, name, now)`
+### `Rules.Join(game, name, now, fullName)`
 
-Phase `lobby` only. A name already in `joined` returns `{}`. Otherwise appends
-and returns `{ {type="joined", name=name} }`.
+Phase `lobby` only. A name already in `joined` returns `{}`. Otherwise appends,
+notes `fullName` (below) and returns `{ {type="joined", name=name} }`.
+
+### Full names
+
+`game.fullNames` maps a character name to the name to show, with the
+Forever surname. `New` fills it from the optional `opts.fullNames` (a
+table, else raises); `Join` notes the joiner's `fullName`; `Roll` notes the
+roller's `fullName` whenever the name is in `joined`, before any other
+check, because the roll line is where the surname shows. Noting keeps a
+surname once seen: a `fullName` different from the name always wins, a
+bare one only fills an empty slot. Nil or empty `fullName` is ignored.
+`Rules.FullName(game, name)` returns `fullNames[name]`, else `name`.
+Events and every other field keep character names.
 
 ### `Rules.Tick(game, now)`
 
@@ -88,7 +101,7 @@ In phase `rolling`:
    countdown with `Rules.REMINDERS` and `remindersSent`, returning one
    `reminder{names = Waiting(game), secondsLeft, max = rollMax}`.
 
-### `Rules.Roll(game, name, roll, min, max, now)`
+### `Rules.Roll(game, name, roll, min, max, now, fullName)`
 
 Phase `rolling` only, else `{}`. `name` must be in `rollers` and must not
 have rolled this round (no `rolls[name]` in a main round, no
@@ -120,7 +133,7 @@ Runs when every roller has rolled or the deadline passed.
    `call{...}`.
 4. Otherwise set `game.high`, `game.low`. `highs` = pool names with roll
    `high`, `lows` = those with roll `low`, both in join order. If `#highs
-   == 1`, `winner = highs[1]`; if `#lows == 1`, `loser = lows[1]`. Then
+   == 1`, `winner = highs[1]`; if `#lows == 1`, `losers = { lows[1] }`. Then
    decide (below) with `tieHigh = highs` when `#highs > 1` else nil, and
    `tieLow = lows` when `#lows > 1` else nil.
 
@@ -132,22 +145,26 @@ Runs when every roller has rolled or the deadline passed.
    1`, `winner = top[1]` and `tieHigh = nil`; else `tieHigh = top`. A tied
    player who did not roll drops out of the running.
 2. Low side, when `tie.low` is set: `noShows` = names in `tie.low` without
-   a `tieRolls` entry, `rolled` = the rest. If `rolled` is empty: cancel for
-   no rolls and stop. If `#noShows == 1`, `loser = noShows[1]` (not rolling
-   is the worse outcome) and `tieLow = nil`. If `#noShows > 1`, `tieLow =
-   noShows`: they roll off against each other. Otherwise `worst` = the
-   smallest tie roll and `bottom` = those with it; if `#bottom == 1`,
-   `loser = bottom[1]` and `tieLow = nil`, else `tieLow = bottom`.
+   a `tieRolls` entry, `rolled` = the rest. If `rolled` is empty, nobody
+   rolled: `losers = noShows` (all of them, in join order) and `tieLow =
+   nil`; each owes the full amount. If `#noShows == 1`, `losers = {
+   noShows[1] }` (not rolling is the worse outcome) and `tieLow = nil`. If
+   `#noShows > 1`, `tieLow = noShows`: they roll off against each other.
+   Otherwise `worst` = the smallest tie roll and `bottom` = those with it;
+   if `#bottom == 1`, `losers = { bottom[1] }` and `tieLow = nil`, else
+   `tieLow = bottom`.
 3. Decide (below).
 
-Cancel for no rolls: `phase = "cancelled"`, `cancelReason = "noRolls"`,
-`endedAt = now`, event `cancelled{reason = "noRolls"}`.
+Cancel for no rolls (the high side only): `phase = "cancelled"`,
+`cancelReason = "noRolls"`, `endedAt = now`, event `cancelled{reason =
+"noRolls"}`. A low side nobody rolls never cancels: they all pay.
 
 **Decide** (internal), with `tieHigh` and `tieLow` each a list or nil:
 
-- Both `winner` and `loser` set: `phase = "finished"`, `endedAt = now`,
-  `owed = Rules.Owed(high, low, wager, rollMax)`, `tie = nil`,
-  `rollers = {}`. Event `winner{name = winner, loser, high, low, owed}`.
+- Both `winner` and `losers` set: `phase = "finished"`, `endedAt = now`,
+  `owed = Rules.Owed(high, low, wager, rollMax)` (what each loser owes),
+  `tie = nil`, `rollers = {}`. Event `winner{name = winner, losers =
+  copy(losers), high, low, owed}`.
 - Otherwise `tie = { high = tieHigh, low = tieLow }`, `rollers = tieHigh
   followed by tieLow` (each in join order), start a round, event
   `tieBreak{high = tieHigh, low = tieLow, max = rollMax, seconds =
@@ -165,8 +182,10 @@ Phase `lobby` or `rolling`: `phase = "cancelled"`, `cancelReason = "host"`,
 
 `Waiting(game)` returns, in `rollers` order, the names that have not rolled
 this round; `{}` outside phase `rolling`. `Owed(high, low, wager, rollMax)`
-returns `math.floor((high - low) * wager / rollMax)`. `IsLive(game)` is true
-in `lobby` and `rolling`.
+returns `math.floor((high - low) * wager / rollMax)`, computed exactly even
+when the product passes 2^53: with `whole = math.floor(wager / rollMax)`
+and `rest = wager - whole * rollMax`, it is `gap * whole + math.floor(gap *
+rest / rollMax)`. `IsLive(game)` is true in `lobby` and `rolling`.
 
 ### Edge cases
 
@@ -226,33 +245,40 @@ roll, at)` is shorthand for `Roll(game, name, roll, 1, 100, at)`.
 | AC-03-16 | `R(Alice, 97, t+1)` | `{rolled Alice 97 waiting=2}`, `rolls.Alice == 97`, `history == {{name="Alice", roll=97, max=100, round=1}}` |
 | AC-03-17 | then `R(Alice, 40, t+2)` | `{}`; `rolls.Alice` still 97; `history` has one entry |
 | AC-03-18 | `Waiting(game)` after Alice rolled | `{"Bob", "Carl"}`; in the lobby `{}` |
-| AC-03-19 | then `R(Bob, 61, t+3)`, `R(Carl, 8, t+4)` | second gives `{rolled Carl 8 waiting=0, winner name=Alice loser=Carl high=97 low=8 owed=890000}`; phase `finished`; `game.owed == 890000`; `satOut == {}` |
+| AC-03-19 | then `R(Bob, 61, t+3)`, `R(Carl, 8, t+4)` | second gives `{rolled Carl 8 waiting=0, winner name=Alice losers={"Carl"} high=97 low=8 owed=890000}`; phase `finished`; `game.owed == 890000`; `satOut == {}` |
 | AC-03-20 | After finish: `Roll`, `Tick`, `Cancel`, `Join` | each `{}` |
 | AC-03-21 | 3-player game; `Tick(t + 25)`, `Tick(t + 25)`, `Tick(t + 35)`, `Tick(t + 40)` | `{reminder names={A,B,C} secondsLeft=20 max=100}`, `{}`, `{reminder 10}`, `{reminder 5}` |
 | AC-03-22 | `R(Alice, 97, t+1)`; `Tick(t + 35)` | `{reminder names={B,C} 10}` |
-| AC-03-23 | `R(Alice, 97)`, `R(Bob, 61)`; `Tick(t + 45)` | `{satOut names={"Carl"}, winner Alice loser=Bob high=97 low=61 owed=360000}`; `satOut == {"Carl"}` |
+| AC-03-23 | `R(Alice, 97)`, `R(Bob, 61)`; `Tick(t + 45)` | `{satOut names={"Carl"}, winner Alice losers={"Bob"} high=97 low=61 owed=360000}`; `satOut == {"Carl"}` |
 | AC-03-24 | `R(Alice, 97)` only; `Tick(t + 45)` | `{satOut names={B,C}, cancelled tooFew}`; phase `cancelled` |
 | AC-03-25 | nobody rolls; `Tick(t + 45)` | `{satOut names={A,B,C}, cancelled tooFew}` |
 | AC-03-26 | `Tick(t + 45)` with no reminders sent | no reminder in the list |
 | AC-03-27 | `R(Alice, 50)`, `R(Bob, 50)`, `R(Carl, 50)` at `t+3` | last gives `{rolled, allTied roll=50 names={A,B,C}, call names={A,B,C} max=100 seconds=45}`; `round == 2`; `rolls == {}`; `rollDeadline == t + 48`; `tie == nil` |
-| AC-03-28 | then `R(Alice, 10)`, `R(Bob, 20)`, `R(Carl, 30)` | finishes: winner Carl, loser Alice, high 30, low 10, owed 200000 |
-| AC-03-29 | 4-player game (Alice, Bob, Carl, Dan); `R(Alice, 97)`, `R(Bob, 61)`, `R(Carl, 8)`, `R(Dan, 97)` | last gives `{rolled, tieBreak high={"Alice","Dan"} low=nil max=100 seconds=45}`; `winner == nil`, `loser == "Carl"`, `high == 97`, `low == 8`; `rollers == {"Alice","Dan"}`; `round == 2`; `tie.high == {"Alice","Dan"}` |
+| AC-03-28 | then `R(Alice, 10)`, `R(Bob, 20)`, `R(Carl, 30)` | finishes: winner Carl, losers {"Alice"}, high 30, low 10, owed 200000 |
+| AC-03-29 | 4-player game (Alice, Bob, Carl, Dan); `R(Alice, 97)`, `R(Bob, 61)`, `R(Carl, 8)`, `R(Dan, 97)` | last gives `{rolled, tieBreak high={"Alice","Dan"} low=nil max=100 seconds=45}`; `winner == nil`, `losers == {"Carl"}`, `high == 97`, `low == 8`; `rollers == {"Alice","Dan"}`; `round == 2`; `tie.high == {"Alice","Dan"}` |
 | AC-03-30 | then `R(Bob, 50)` | `{}` (not a roller this round) |
-| AC-03-31 | then `R(Alice, 30)`, `R(Dan, 70)` | last gives `{rolled Dan 70 waiting=0, winner name=Dan loser=Carl high=97 low=8 owed=890000}`; `tieRolls.Dan == 70`; `history[6].round == 2` |
-| AC-03-32 | 4-player game; rolls Alice 97, Bob 8, Carl 8, Dan 61; then `R(Bob, 40)`, `R(Carl, 20)` | tie-break `low={"Bob","Carl"} high=nil`, winner Alice set at once; after the tie rolls `winner name=Alice loser=Carl owed=890000` |
-| AC-03-33 | 4-player game; rolls 97, 97, 8, 8 (Alice, Bob, Carl, Dan) | `tieBreak high={A,B} low={C,D}`; `rollers == {A,B,C,D}`; then tie rolls Alice 10, Bob 20, Carl 30, Dan 5 give `winner name=Bob loser=Dan` |
+| AC-03-31 | then `R(Alice, 30)`, `R(Dan, 70)` | last gives `{rolled Dan 70 waiting=0, winner name=Dan losers={"Carl"} high=97 low=8 owed=890000}`; `tieRolls.Dan == 70`; `history[6].round == 2` |
+| AC-03-32 | 4-player game; rolls Alice 97, Bob 8, Carl 8, Dan 61; then `R(Bob, 40)`, `R(Carl, 20)` | tie-break `low={"Bob","Carl"} high=nil`, winner Alice set at once; after the tie rolls `winner name=Alice losers={"Carl"} owed=890000` |
+| AC-03-33 | 4-player game; rolls 97, 97, 8, 8 (Alice, Bob, Carl, Dan) | `tieBreak high={A,B} low={C,D}`; `rollers == {A,B,C,D}`; then tie rolls Alice 10, Bob 20, Carl 30, Dan 5 give `winner name=Bob losers={"Dan"}` |
 | AC-03-34 | high tie Alice, Dan (as AC-03-29); `R(Alice, 30)`; `Tick(t + 90)` | `{winner name=Alice ...}` (Dan did not roll and drops out) |
 | AC-03-35 | high tie; nobody rolls; `Tick(t + 90)` | `{cancelled noRolls}`, phase `cancelled`, `cancelReason == "noRolls"` |
-| AC-03-36 | low tie Bob, Carl (as AC-03-32); `R(Bob, 40)`; `Tick` past the deadline | `{winner name=Alice loser=Carl}` (the no-show pays) |
+| AC-03-36 | low tie Bob, Carl (as AC-03-32); `R(Bob, 40)`; `Tick` past the deadline | `{winner name=Alice losers={"Carl"}}` (the no-show pays) |
 | AC-03-37 | 5-player low tie Bob, Carl, Dan; only Bob rolls; deadline | `{tieBreak high=nil low={"Carl","Dan"}}`, `round == 3` |
+| AC-03-48 | low tie Bob, Carl (as AC-03-32); nobody rolls; `Tick` past the deadline | `{winner name=Alice losers={"Bob","Carl"} high=97 low=8 owed=890000}`, phase `finished` |
+| AC-03-49 | 4-player game, rolls 97, 97, 8, 8 (Alice, Bob, Carl, Dan); tie rolls Alice 60, Bob 40, Carl and Dan none; deadline | `{winner name=Alice losers={"Carl","Dan"} ...}` |
 | AC-03-38 | high tie Alice, Dan; both tie-roll 50 | `{rolled, tieBreak high={"Alice","Dan"} low=nil}`, `round == 3`, `tieRolls == {}` |
 | AC-03-39 | tie-break with both sides; the high side resolves on the deadline and the low side has two no-shows | `{tieBreak high=nil low={the two}}` and `winner` set |
 | AC-03-40 | `Owed(97, 8, 1000000, 100)`, `Owed(90, 80, 1000000, 100)`, `Owed(5, 2, 10000, 1000)`, `Owed(50, 50, 10000, 100)` | `890000`, `100000`, `30`, `0` |
+| AC-03-50 | `Owed(991923, 218, 9650332415, 991923)`, `Owed(1000000, 1, 9999999999, 1000000)` | `9648211511` (the plain product would floor to one more), `9999989999` |
+| AC-03-51 | `Join(Forgot, fullName "Forgot")` | `FullName(game, "Forgot") == "Forgot"`; `FullName(game, "Bob") == "Bob"` |
+| AC-03-52 | then a roll from Forgot with fullName `"Forgot Shards"`, then one with `"Forgot"` | `FullName` is `"Forgot Shards"` after both |
+| AC-03-53 | `Join(Forgot, "Forgot Shards")`; a roll from Dan (not joined) with `"Dan Stranger"` | `FullName(Forgot) == "Forgot Shards"`, `FullName(Dan) == "Dan"`, `fullNames.Dan == nil` |
+| AC-03-54 | `New` with `fullNames = { Alice = "Alice Vale" }`; with `fullNames = "Alice Vale"` | `FullName(Alice) == "Alice Vale"`; raises |
 | AC-03-41 | `Cancel` in lobby; `Cancel` in rolling; `Cancel` during a tie-break | each `{cancelled host}`, phase `cancelled` |
 | AC-03-42 | `IsLive` in lobby, rolling, finished, cancelled | `true`, `true`, `false`, `false` |
 | AC-03-44 | `New(opts with players={"Alice","Bob","Carl"}, rollTime=15, t0)` | phase `rolling`, `joined` and `rollers` `{"Alice","Bob","Carl"}`, `round == 1`, `rollDeadline == t0 + 15`, events `{ call{names={"Alice","Bob","Carl"}, max=100, seconds=15} }` |
 | AC-03-45 | `New` with `players={"Alice"}`, `{}`, `{"Alice","Alice"}`, `{"Alice", ""}`, `"Alice"` | each raises |
-| AC-03-46 | solo game of AC-03-44; `R(Bob, 90)`, `R(Carl, 10)`, then `Tick(t0 + 15)` | `{satOut{"Alice"}, winner{name=Bob, loser=Carl, high=90, low=10, owed=800000}}` |
+| AC-03-46 | solo game of AC-03-44; `R(Bob, 90)`, `R(Carl, 10)`, then `Tick(t0 + 15)` | `{satOut{"Alice"}, winner{name=Bob, losers={"Carl"}, high=90, low=10, owed=800000}}` |
 | AC-03-47 | solo game of AC-03-44; `Join(game, "Dan", t0)` | `{}`, `joined` unchanged |
 | AC-03-43 | Full scripted game: 5 players, a wrong range, a roll from a non-player, a second roll from the same player, one sat out, a high tie settled by a tie-break in which one of the tied does not roll | the exact event sequence, written out in the spec |
 

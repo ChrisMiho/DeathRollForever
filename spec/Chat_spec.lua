@@ -76,8 +76,8 @@ describe("Chat", function()
 				{ type = "call", names = { "Alice", "Bob" }, max = 100, seconds = 45 })
 		end)
 
-		it("AC-04-07 wrongRange repeats the range", function()
-			assertLine("Carl, wrong range. Type /roll 100",
+		it("AC-04-07 wrongRange tells the player the range, without naming them", function()
+			assertLine("Wrong range, that roll does not count. Type /roll 100",
 				{ type = "wrongRange", name = "Carl", max = 100 })
 		end)
 
@@ -121,17 +121,17 @@ describe("Chat", function()
 
 		it("AC-04-15 winner names both ends, their rolls and what is owed", function()
 			assertLine("WINNER: Alice with 97! Dan rolled 8 and owes Alice 89g.",
-				{ type = "winner", name = "Alice", loser = "Dan", high = 97, low = 8, owed = 890000 })
+				{ type = "winner", name = "Alice", losers = { "Dan" }, high = 97, low = 8, owed = 890000 })
 		end)
 
 		it("AC-04-16 winner formats a small debt in copper", function()
 			assertLine("WINNER: Bob with 5! Alice rolled 2 and owes Bob 30c.",
-				{ type = "winner", name = "Bob", loser = "Alice", high = 5, low = 2, owed = 30 })
+				{ type = "winner", name = "Bob", losers = { "Alice" }, high = 5, low = 2, owed = 30 })
 		end)
 
 		it("RF-4 winner formats a debt in silver", function()
 			assertLine("WINNER: Bob with 3! Alice rolled 1 and owes Bob 3s.",
-				{ type = "winner", name = "Bob", loser = "Alice", high = 3, low = 1, owed = 300 })
+				{ type = "winner", name = "Bob", losers = { "Alice" }, high = 3, low = 1, owed = 300 })
 		end)
 
 		it("AC-04-17 cancelled by the host", function()
@@ -143,8 +143,8 @@ describe("Chat", function()
 				{ type = "cancelled", reason = "tooFew" })
 		end)
 
-		it("AC-04-19 cancelled because nobody rolled the tie-break", function()
-			assertLine("Nobody rolled the tie-break. Game cancelled.",
+		it("AC-04-19 cancelled because nobody rolled the tie for highest", function()
+			assertLine("Nobody rolled the tie for highest. Game cancelled.",
 				{ type = "cancelled", reason = "noRolls" })
 		end)
 
@@ -167,7 +167,7 @@ describe("Chat", function()
 				{ type = "allTied", roll = 50, names = five },
 				{ type = "tieBreak", high = { "Natus Vincere", "Bob", "Carl" }, low = { "Dan", "Eve" },
 					max = 100, seconds = 45 },
-				{ type = "winner", name = "Natus Vincere", loser = "Eve", high = 97, low = 8, owed = 890000 },
+				{ type = "winner", name = "Natus Vincere", losers = { "Eve" }, high = 97, low = 8, owed = 890000 },
 				{ type = "cancelled", reason = "host" },
 				{ type = "cancelled", reason = "tooFew" },
 				{ type = "cancelled", reason = "noRolls" },
@@ -182,8 +182,75 @@ describe("Chat", function()
 		end)
 
 		it("keeps a name with a space as a plain string", function()
-			assertLine("Natus Vincere, wrong range. Type /roll 100",
-				{ type = "wrongRange", name = "Natus Vincere", max = 100 })
+			assertLine("Tie for lowest: Natus Vincere, Bob. Tied players, type /roll 100 again! 45 seconds.",
+				{ type = "tieBreak", low = { "Natus Vincere", "Bob" }, max = 100, seconds = 45 })
+		end)
+
+		it("AC-04-23 winner with two losers: both rolled the lowest and each owe", function()
+			assertLine("WINNER: Alice with 97! Bob and Carl rolled 8, skipped the tie-break and each owe Alice 89g.",
+				{ type = "winner", name = "Alice", losers = { "Bob", "Carl" }, high = 97, low = 8, owed = 890000 })
+		end)
+
+		it("AC-04-24 winner with three losers lists them with commas and a final and", function()
+			assertLine("WINNER: Alice with 97! Bob, Carl and Dan rolled 8, skipped the tie-break and each owe Alice 89g.",
+				{ type = "winner", name = "Alice", losers = { "Bob", "Carl", "Dan" }, high = 97, low = 8, owed = 890000 })
+		end)
+
+		describe("AC-04-25 a line too long with every name gives a count instead", function()
+			local many = {}
+			for i = 1, 40 do
+				many[i] = ("Playername%02d"):format(i)
+			end
+
+			it("countdown", function()
+				assertLine("30 seconds left to join! 40 in",
+					{ type = "countdown", secondsLeft = 30, names = many })
+			end)
+
+			it("closed", function()
+				assertLine("Joining closed! 40 players in.", { type = "closed", joined = many })
+			end)
+
+			it("reminder", function()
+				assertLine("20 seconds! 40 still to roll. Type /roll 100",
+					{ type = "reminder", names = many, secondsLeft = 20, max = 100 })
+			end)
+
+			it("satOut", function()
+				assertLine("40 players did not roll in time and sit out.", { type = "satOut", names = many })
+			end)
+
+			it("tieBreak", function()
+				assertLine("Tie for highest: 40 players. Tied players, type /roll 100 again! 45 seconds.",
+					{ type = "tieBreak", high = many, max = 100, seconds = 45 })
+			end)
+
+			it("winner", function()
+				assertLine("WINNER: Alice with 97! 40 players rolled 8, skipped the tie-break and each owe Alice 89g.",
+					{ type = "winner", name = "Alice", losers = many, high = 97, low = 8, owed = 890000 })
+			end)
+
+			it("keeps every name while the line fits", function()
+				local line = Chat.Render({ type = "closed", joined = { many[1], many[2] } }, game)[1]
+				assert.are.equal(PREFIX .. "Joining closed! 2 players in: Playername01, Playername02", line)
+			end)
+		end)
+
+		it("AC-04-27 lines show each player's full name, surname included", function()
+			game.fullNames = { Forgot = "Forgot Shards" }
+			assertLine("Joining closed! 2 players in: Forgot Shards, Bob",
+				{ type = "closed", joined = { "Forgot", "Bob" } })
+			assertLine("WINNER: Forgot Shards with 97! Bob rolled 8 and owes Forgot Shards 89g.",
+				{ type = "winner", name = "Forgot", losers = { "Bob" }, high = 97, low = 8, owed = 890000 })
+			assertLine("WINNER: Alice with 97! Forgot Shards and Bob rolled 8, skipped the tie-break and each owe Alice 89g.",
+				{ type = "winner", name = "Alice", losers = { "Forgot", "Bob" }, high = 97, low = 8, owed = 890000 })
+		end)
+
+		it("AC-04-26 WhisperTo: a wrong range goes to the player who rolled it, everything else to the chat", function()
+			assert.are.equal("Carl", Chat.WhisperTo({ type = "wrongRange", name = "Carl", max = 100 }))
+			assert.is_nil(Chat.WhisperTo({ type = "call", names = { "Carl" }, max = 100, seconds = 45 }))
+			assert.is_nil(Chat.WhisperTo({ type = "winner", name = "Carl", losers = { "Bob" } }))
+			assert.is_nil(Chat.WhisperTo(nil))
 		end)
 
 		it("rejects a non-table event or game", function()

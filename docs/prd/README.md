@@ -27,7 +27,7 @@ built or verified yet; `v3 implemented` comes once the human has played it.
 | [visual/01-window.md](visual/01-window.md) | The frame: title bar, the `?` hover box, corner (X or Cancel), moving, resizing, show and hide, state switching, redraw | v3 |
 | [visual/02-form.md](visual/02-form.md) | The form: chat (Guild, Party, Raid, Solo), wager, roll max, bots, Start | v3.1 |
 | [visual/03-in-progress.md](visual/03-in-progress.md) | The lobby (countdown, joined) and the round (waiting, highest, lowest, the rest, roll bar, Roll button) | v3 |
-| [visual/04-winner.md](visual/04-winner.md) | The result: winner and roll, standings, the one debt, Reset | v3 |
+| [visual/04-winner.md](visual/04-winner.md) | The result: winner and roll, standings, the debts (one per loser), Reset | v3 |
 | [../mockups/](../mockups/) | `window-v3.html` (rolling, tie-break, result) and `window-v2.html` (form, lobby) | v3 |
 | [orchestration.md](orchestration.md) | For the agent that runs a build: phases, briefs, definition of done, when to stop for in-game testing | v3 |
 | [../../PRD.md](../../PRD.md) | Product overview and roadmap. Intent, not behaviour | all |

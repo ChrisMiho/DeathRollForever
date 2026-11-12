@@ -29,6 +29,7 @@ local CHAT_EVENTS = {
 }
 
 local game -- the running game, or nil
+local rollPattern -- the client's roll-result pattern, built on the first Start
 local ticker -- the C_Timer ticker while a game is live, or nil
 local listener -- the one Host.OnChange listener, or nil
 local frame = CreateFrame("Frame")
@@ -99,8 +100,13 @@ function post(events)
 		end
 	else
 		for _, event in ipairs(events) do
+			local whisperTo = ns.Chat.WhisperTo(event)
 			for _, line in ipairs(ns.Chat.Render(event, game)) do
-				SendChatMessage(line, game.channel) -- [P0-POST]
+				if whisperTo then
+					SendChatMessage(line, "WHISPER", nil, whisperTo)
+				else
+					SendChatMessage(line, game.channel) -- [P0-POST]
+				end
 			end
 		end
 	end
@@ -124,22 +130,25 @@ local function tick()
 	post(ns.Rules.Tick(game, GetTime()))
 end
 
+-- Players are known by their character name (Parse.PlayerName): the chat
+-- sender carries a realm, the roll line a Forever surname, and both must
+-- give the same name for a joined player's roll to count.
 local function onChannelMessage(text, sender)
-	local name = Ambiguate(sender, "short")
-	if ns.Parse.JoinWord(text, game.joinWord) then
-		post(ns.Rules.Join(game, name, GetTime()))
+	local name, fullName = ns.Parse.PlayerName(sender)
+	if name and ns.Parse.JoinWord(text, game.joinWord) then
+		post(ns.Rules.Join(game, name, GetTime(), fullName))
 	end
 end
 
 -- [P0-ROLL] answered 2026-11-05: the host's own roll shows with the host's
 -- name like everyone else's, never as "You", so no mapping is needed.
 local function onSystemMessage(text)
-	local name, roll, min, max = ns.Parse.Roll(text)
+	local rawName, roll, min, max = ns.Parse.Roll(text, rollPattern)
+	local name, fullName = ns.Parse.PlayerName(rawName)
 	if not name then
 		return
 	end
-	name = Ambiguate(name, "short")
-	post(ns.Rules.Roll(game, name, roll, min, max, GetTime()))
+	post(ns.Rules.Roll(game, name, roll, min, max, GetTime(), fullName))
 end
 
 frame:SetScript("OnEvent", function(_, event, text, sender)
@@ -161,28 +170,42 @@ function Host.Game()
 	return game
 end
 
-function Host.Start(opts)
+-- The host's own name as games know it: the character name, without the
+-- Forever surname that GetUnitName adds or a realm (Parse.PlayerName). The
+-- second return is the name to show, surname kept.
+function Host.PlayerName()
+	return ns.Parse.PlayerName(GetUnitName("player", true))
+end
+
+function Host.Start(start)
 	if Host.IsHosting() then
 		return nil, ALREADY_RUNNING
 	end
-	if not isMember(opts.channel) then
-		return nil, NOT_IN[opts.channel]
+	if not isMember(start.channel) then
+		return nil, NOT_IN[start.channel]
 	end
-	-- opts comes from Parse.StartArgs or View.StartOpts with channel, wager
-	-- and an optional rollMax; the rest is filled from the defaults.
+	-- The client's own roll text, so a non-English client reads rolls too;
+	-- the English pattern when the client's text cannot be turned into one.
+	rollPattern = rollPattern or ns.Parse.RollPattern(RANDOM_ROLL_RESULT) or ns.Parse.ROLL_PATTERN
+	-- start comes from Parse.StartArgs or View.StartOpts with channel, wager,
+	-- an optional rollMax and, for a solo game, an optional bots; the rest is
+	-- filled from the defaults into a table of our own.
 	local defaults = ns.Rules.DEFAULTS
-	if opts.rollMax == nil then
-		opts.rollMax = defaults.rollMax
-	end
-	opts.host = Ambiguate(GetUnitName("player", true), "short") -- with the Forever surname, as rolls print it
-	opts.joinWord = defaults.joinWord
-	opts.joinTime = defaults.joinTime
-	opts.rollTime = defaults.rollTime
+	local host, hostFullName = Host.PlayerName()
+	local opts = {
+		host = host,
+		fullNames = { [host] = hostFullName },
+		channel = start.channel,
+		wager = start.wager,
+		rollMax = start.rollMax or defaults.rollMax,
+		joinWord = defaults.joinWord,
+		joinTime = defaults.joinTime,
+		rollTime = defaults.rollTime,
+	}
 	if opts.channel == "SOLO" then
 		opts.rollTime = ns.Solo.ROLL_TIME
-		opts.players = ns.Solo.Players(opts.host, UnitFactionGroup("player"), opts.bots or ns.Solo.BOTS, math.random)
+		opts.players = ns.Solo.Players(opts.host, UnitFactionGroup("player"), start.bots or ns.Solo.BOTS, math.random)
 	end
-	opts.bots = nil
 
 	local events
 	game, events = ns.Rules.New(opts, GetTime())

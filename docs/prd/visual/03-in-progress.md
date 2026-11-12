@@ -43,7 +43,7 @@ Unchanged from v2.
 | `subtitle` | `View.Subtitle(game)` |
 | `header` | `{ label, count }`, see below |
 | `rows` | see below |
-| `status` | main round 1: `"Everyone: /roll <max>"`; a later main round: `"Everyone: /roll <max> again"`; tie-break: `"<rollers joined by ', '>: /roll <max> again"` |
+| `status` | main round 1: `"Everyone: /roll <max>"`; a later main round: `"Everyone: /roll <max> again"`; tie-break: `"<rollers' full names joined by ', '>: /roll <max> again"` |
 | `secondsLeft` | `math.max(0, math.ceil(game.rollDeadline - now))` |
 | `fraction` | `(game.rollDeadline - now) / game.rollTime`, clamped to 0..1 |
 | `button` | `{ label = "Roll 1-<max>", enabled = (host is in waiting), max = game.rollMax }` |
@@ -65,7 +65,7 @@ value, tag, mark }`, in five groups, in this order:
    `game.rolls` with the largest roll, in `joined` order. `mark = "high"`,
    `value` = the name's main-round roll as text.
 3. **Lowest**: `game.tie.low` when a tie-break has a low side; else
-   `{ game.loser }` when the loser is decided; else every name in
+   `game.losers` when the losers are decided; else every name in
    `game.rolls` with the smallest roll that is not already in the highest
    group (so a single roll, or all-equal rolls, make only highest rows).
    `mark = "low"`, `value` = the roll.
@@ -205,6 +205,7 @@ Eve 97, so a high tie-break between Alice and Eve started at `t + 1`.
 | AC-15-24 | `Game(rolling, "Eve", 1100)` | `secondsLeft = 0`, `fraction = 0` |
 | AC-15-25 | `Lobby(rolling, ...)`, `Game(lobby, ...)` | raises |
 | AC-15-26 | 4 players Alice, Bob, Carl, Dan; rolls Alice 97, Bob 97, Carl 8, Dan none; `Tick` past the deadline | a high tie-break with Dan sat out: rows `Alice high re-roll`, `Bob high re-roll`, `Carl low lowest`, `Dan out ""` with value `sat out`; `header.count = "0 of 2"` |
+| AC-15-28 | the tie fixture with `fullNames.Alice = "Alice Vale"`; Alice re-rolls 40 | status `Alice Vale, Eve: /roll 100 again`; row 1 `name == "Alice Vale"`, tag `re-rolled 40`; no other fields on the row |
 | AC-15-27 | 4 players; rolls Alice 97, Bob 97, Carl 8, Dan 97; tie rolls Alice 50, Dan 50, Bob none; `Tick` past the deadline | a second high tie-break (`round == 3`): rows `Alice high re-roll`, `Dan high re-roll`, `Carl low lowest`, `Bob "" ""` with value `97` |
 | AC-15-28 | 5 players; rolls Alice 97, Bob 8, Carl 8, Dan 8, Eve 50; tie rolls Bob 40, Carl none, Dan none; deadline | a low roll-off between Carl and Dan with the winner decided: rows `Alice high highest`, `Carl low re-roll`, `Dan low re-roll`, then `Eve "" ""` 50 and `Bob "" ""` 8 |
 

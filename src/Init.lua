@@ -19,19 +19,20 @@ ns.version = GetVersion()
 ns.Print = Print
 
 -- The help lines, exactly as 05-host-controller.md lists them, /dr first.
+-- %d in the solo line is Solo.BOTS, filled in when the list prints.
 local HELP = {
 	"/dr                          open the window",
 	"/dr g <wager> [roll max]     start in guild chat (1g, 50s, 1g50s, 1.5g)",
 	"/dr p <wager> [roll max]     start in party chat",
 	"/dr r <wager> [roll max]     start in raid chat",
-	"/dr solo <wager> [roll max]  practise alone against 10 bots",
+	"/dr solo <wager> [roll max]  practise alone against %d bots",
 	"/dr cancel                   cancel the running game",
 	"/dr help                     this list",
 }
 
 local function PrintHelp()
 	for _, line in ipairs(HELP) do
-		Print(line)
+		Print(line:find("%d", 1, true) and line:format(ns.Solo.BOTS) or line)
 	end
 end
 

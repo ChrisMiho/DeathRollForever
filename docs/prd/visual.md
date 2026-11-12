@@ -16,7 +16,7 @@ is still to roll dimmed at the top, the highest roll tinted, the lowest in
 red right under it, the rest fanned out from both ends, a roll timer, and a
 Roll button that rolls the right range until the host has rolled. A Cancel
 button in the corner does what `/dr cancel` does. When the game ends the
-winner with their roll, the standings and the one debt stay on screen
+winner with their roll, the standings and the debt (one per loser) stay on screen
 until Reset returns the window to the form with the last values filled in.
 A `?` in the title bar explains the game on hover. The title bar, bars,
 highest row and main button are tinted by the host's own faction.
@@ -200,5 +200,6 @@ and `[P0-CLICKROLL]`.
 | 2026-11-06 | Rolling rows: waiting on top, then highest, then lowest, then the rest fanned from both ends | The host wanted the two rows that matter together, the near misses under them, and an easy call-out of who has not rolled |
 | 2026-11-06 | The lowest row has its own colour, dark red on Alliance and amber on Horde | The Horde tint is already red; the lowest row must read apart from the highest |
 | 2026-11-06 | The result keeps the standings list and replaces `Total` with the one debt | Same layout as v2 with one loser instead of many |
+| 2026-11-11 | One debt row per loser, under one line | Everyone tied for lowest who skips the tie-break pays (functional 4.5) |
 | 2026-11-06 | A `?` in the title bar, in every state, with a six-line hover box | The host asked for a hover box that explains the game; the title bar is the one place every state shares |
 | 2026-11-06 | `/dr` opens the window; `/dr show` is gone | The host found `show` awkward |

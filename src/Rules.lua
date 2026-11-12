@@ -6,7 +6,8 @@ local _, ns = ...
 --
 -- v3 is one round: everyone rolls once, the highest roll wins and the lowest
 -- roll pays the difference. Ties for highest or lowest are settled by
--- tie-break rounds among the tied players only.
+-- tie-break rounds among the tied players only; when nobody tied for lowest
+-- rolls the tie-break, they all pay.
 
 local Rules = {}
 ns.Rules = Rules
@@ -49,6 +50,17 @@ local function contains(list, name)
 		end
 	end
 	return false
+end
+
+-- Remembers how to show a player: a full name with a surname replaces the
+-- bare character name, never the other way round.
+local function noteFullName(game, name, fullName)
+	if type(fullName) ~= "string" or fullName == "" then
+		return
+	end
+	if fullName ~= name or game.fullNames[name] == nil then
+		game.fullNames[name] = fullName
+	end
 end
 
 local function checkType(value, expected, label)
@@ -130,10 +142,10 @@ local function cancel(game, now, reason)
 	return { type = "cancelled", reason = reason }
 end
 
--- Both ends decided: finish. Otherwise start a tie-break round among the
--- tied names. Appends the resulting event to `events`.
+-- Both ends decided (a winner and at least one loser): finish. Otherwise
+-- start a tie-break round among the tied names. Appends the resulting event to `events`.
 local function decide(game, now, tieHigh, tieLow, events)
-	if game.winner and game.loser then
+	if game.winner and game.losers then
 		game.phase = "finished"
 		game.endedAt = now
 		game.owed = Rules.Owed(game.high, game.low, game.wager, game.rollMax)
@@ -142,7 +154,7 @@ local function decide(game, now, tieHigh, tieLow, events)
 		table.insert(events, {
 			type = "winner",
 			name = game.winner,
-			loser = game.loser,
+			losers = copy(game.losers),
 			high = game.high,
 			low = game.low,
 			owed = game.owed,
@@ -226,7 +238,7 @@ local function settleMain(game, now)
 		game.winner = highs[1]
 	end
 	if #lows == 1 then
-		game.loser = lows[1]
+		game.losers = { lows[1] }
 	end
 	decide(game, now, #highs > 1 and highs or nil, #lows > 1 and lows or nil, events)
 	return events
@@ -251,17 +263,15 @@ local function settleTieBreak(game, now)
 	if game.tie.low then
 		local rolled, noShows = splitRolled(game.tie.low, game.tieRolls)
 		if #rolled == 0 then
-			table.insert(events, cancel(game, now, "noRolls"))
-			return events
-		end
-		if #noShows == 1 then
-			game.loser = noShows[1]
+			game.losers = noShows -- nobody rolled: every one of them pays
+		elseif #noShows == 1 then
+			game.losers = { noShows[1] }
 		elseif #noShows > 1 then
 			tieLow = noShows
 		else
 			local _, _, _, bottom = extremes(rolled, game.tieRolls)
 			if #bottom == 1 then
-				game.loser = bottom[1]
+				game.losers = { bottom[1] }
 			else
 				tieLow = bottom
 			end
@@ -327,12 +337,20 @@ function Rules.New(opts, now)
 		high = nil,
 		low = nil,
 		winner = nil,
-		loser = nil,
+		losers = nil,
 		owed = nil,
 		satOut = {},
 		endedAt = nil,
 		cancelReason = nil,
+
+		fullNames = {},
 	}
+	if opts.fullNames ~= nil then
+		checkType(opts.fullNames, "table", "opts.fullNames")
+		for name, fullName in pairs(opts.fullNames) do
+			noteFullName(game, name, fullName)
+		end
+	end
 	if opts.players == nil then
 		return game, { { type = "kickoff" } }
 	end
@@ -345,7 +363,7 @@ function Rules.New(opts, now)
 	return game, { callEvent(game) }
 end
 
-function Rules.Join(game, name, now) -- luacheck: no unused args
+function Rules.Join(game, name, now, fullName) -- luacheck: no unused args
 	if game.phase ~= "lobby" then
 		return {}
 	end
@@ -353,6 +371,7 @@ function Rules.Join(game, name, now) -- luacheck: no unused args
 		return {}
 	end
 	table.insert(game.joined, name)
+	noteFullName(game, name, fullName)
 	return { { type = "joined", name = name } }
 end
 
@@ -380,7 +399,10 @@ function Rules.Tick(game, now)
 	return {}
 end
 
-function Rules.Roll(game, name, roll, min, max, now)
+function Rules.Roll(game, name, roll, min, max, now, fullName)
+	if contains(game.joined, name) then
+		noteFullName(game, name, fullName) -- the roll line carries the surname
+	end
 	if not isRolling(game) or not contains(game.rollers, name) then
 		return {}
 	end
@@ -421,8 +443,20 @@ function Rules.Waiting(game)
 	return waiting
 end
 
+-- math.floor((high - low) * wager / rollMax), computed without the product
+-- ever passing 2^53: the wager is split into whole multiples of rollMax and
+-- a remainder below it, so every intermediate stays an exact integer.
 function Rules.Owed(high, low, wager, rollMax)
-	return math.floor((high - low) * wager / rollMax)
+	local gap = high - low
+	local whole = math.floor(wager / rollMax)
+	local rest = wager - whole * rollMax
+	return gap * whole + math.floor(gap * rest / rollMax)
+end
+
+-- How to show a player: the fullest name seen (with the Forever surname),
+-- else the character name itself.
+function Rules.FullName(game, name)
+	return (game.fullNames and game.fullNames[name]) or name
 end
 
 function Rules.IsLive(game)

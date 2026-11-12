@@ -5,6 +5,17 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- Rules: when nobody tied for lowest rolls the tie-break, the game no longer cancels: they all pay, each owing the winner the full amount. The result line says `Bob and Carl rolled 8, skipped the tie-break and each owe Alice 89g.` and the window shows one debt row per loser. A tie for highest that nobody rolls still cancels, and its line now says `Nobody rolled the tie for highest. Game cancelled.`
+- Announcements: a roll in the wrong range is whispered to that player (`Wrong range, that roll does not count. Type /roll 100`) instead of posted in the game's chat.
+- Announcements: in big games, a line that would pass chat's 255-character limit gives the number of players instead of every name (`Joining closed! 40 players in.`); the window still lists everyone.
+- Help: the `/dr solo` help line takes the bot count from the game instead of a typed-in 10.
+
+### Fixed
+- Rolls: players with a Forever surname could sit out of guild, party and raid games, because their join was read from the chat sender and their roll from the roll line, which adds the surname. Players are now matched by character name, so the two always match, and shown with their surname once the host has seen it (from their roll, or the host's own name).
+- Rolls: a host playing on a client in another language now reads rolls, using the client's own roll text.
+- Rules: the amount owed stays exact to the copper even for the largest wager and roll max.
+
 ## [0.3.0] - 2026-11-10
 
 Practise alone: `/dr solo 1g` (or `Solo` on the form) plays you against

@@ -10,6 +10,8 @@ ns.Parse = Parse
 
 -- [P0-ROLL] confirmed 2026-11-05: "Name rolls 734 (1-1000)" for everyone,
 -- the host included; names may contain a space, so the name is (.-).
+-- The English pattern; Parse.RollPattern builds the client's own from
+-- RANDOM_ROLL_RESULT, and this is the fallback.
 Parse.ROLL_PATTERN = "^(.-) rolls (%d+) %((%d+)%-(%d+)%)$"
 
 Parse.CHANNELS = {
@@ -45,6 +47,48 @@ function Parse.Roll(systemMessage, pattern)
 		return nil
 	end
 	return name, tonumber(roll), tonumber(min), tonumber(max)
+end
+
+-- A roll-result format like RANDOM_ROLL_RESULT ("%s rolls %d (%d-%d)") as
+-- a pattern for Parse.Roll: the name as (.-), each number as (%d+), the
+-- rest literal. nil unless the format has one %s followed by three %d and
+-- no positional ("%1$s") arguments.
+function Parse.RollPattern(format)
+	if type(format) ~= "string" or format:find("$", 1, true) then
+		return nil
+	end
+	local name = format:find("%s", 1, true)
+	local number = format:find("%d", 1, true)
+	if not name or not number or name > number then
+		return nil
+	end
+	local escaped = format:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0")
+	local pattern, names = escaped:gsub("%%%%s", "(.-)")
+	local numbers
+	pattern, numbers = pattern:gsub("%%%%d", "(%%d+)")
+	if names ~= 1 or numbers ~= 3 then
+		return nil
+	end
+	return "^" .. pattern .. "$"
+end
+
+-- The character name a player is known by: the first word of a chat sender
+-- or a roll line, without the realm. WoW Forever prints a surname after the
+-- character name ("Forgot Shards"), and chat senders carry a realm
+-- ("Forgot-Realm"); character names themselves have neither a space nor a
+-- hyphen, so both reduce to "Forgot". The second return is the name to show:
+-- the text up to the realm, surname kept ("Forgot Shards"). nil for anything
+-- without a name.
+function Parse.PlayerName(text)
+	if type(text) ~= "string" then
+		return nil
+	end
+	local name = text:match("^%s*([^%s%-]+)")
+	if not name then
+		return nil
+	end
+	local full = text:match("^%s*([^%-]*)"):match("^(.-)%s*$")
+	return name, full
 end
 
 function Parse.Command(text)

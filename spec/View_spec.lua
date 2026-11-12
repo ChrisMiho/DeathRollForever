@@ -387,6 +387,16 @@ describe("View", function()
 				assert.are.equal("Alice, Eve: /roll 100 again", View.Game(tie, "Eve", 1002).status)
 			end)
 
+			it("AC-15-28 a tie-break shows full names in the rows and the status; the tags still follow the player", function()
+				tie.fullNames.Alice = "Alice Vale"
+				Rules.Roll(tie, "Alice", 40, 1, 100, 1003)
+				local model = View.Game(tie, "Eve", 1004)
+				assert.are.equal("Alice Vale, Eve: /roll 100 again", model.status)
+				assert.are.equal("Alice Vale", model.rows[1].name)
+				assert.are.equal("re-rolled 40", model.rows[1].tag)
+				assert.is_nil(model.rows[1].key)
+			end)
+
 			it("AC-15-20 the button is enabled while the tied host has not re-rolled", function()
 				assert.is_true(View.Game(tie, "Eve", 1002).button.enabled)
 			end)
@@ -553,11 +563,25 @@ describe("View", function()
 				assert.are.same({ false, false, false, false, true, false, false }, field(rows, "you"))
 			end)
 
-			it("AC-16-04 the debt names the loser and the winner with the amount owed", function()
+			it("AC-16-04 the one debt names the loser and the winner with the amount owed", function()
 				assert.are.same(
-					{ text = "Dan owes Alice", you = false, amount = "89g" },
-					View.Result(finished, "Eve").debt
+					{ { text = "Dan owes Alice", you = false, amount = "89g" } },
+					View.Result(finished, "Eve").debts
 				)
+			end)
+
+			it("AC-16-09 everyone tied for lowest skipped the tie-break: both are lowest and each owes", function()
+				local game = newRound(OPTS, { "Alice", "Bob", "Carl", "Dan" }, {
+					{ "Alice", 97 }, { "Bob", 61 }, { "Carl", 8 }, { "Dan", 8 },
+				})
+				Rules.Tick(game, 1100)
+				local model = View.Result(game, "Dan")
+				assert.are.same({ "Alice", "Carl", "Dan", "Bob" }, field(model.rows, "name"))
+				assert.are.same({ "high", "low", "low", "" }, field(model.rows, "mark"))
+				assert.are.same({
+					{ text = "Carl owes Alice", you = false, amount = "89g" },
+					{ text = "Dan owes Alice", you = true, amount = "89g" },
+				}, model.debts)
 			end)
 
 			it("AC-16-05 two players: the winner, the loser and the host's own debt", function()
@@ -570,7 +594,7 @@ describe("View", function()
 					{ name = "Alice", you = false, value = "5", mark = "high" },
 					{ name = "Bob", you = true, value = "2", mark = "low" },
 				}, model.rows)
-				assert.are.same({ text = "Bob owes Alice", you = true, amount = "30c" }, model.debt)
+				assert.are.same({ { text = "Bob owes Alice", you = true, amount = "30c" } }, model.debts)
 			end)
 
 			it("AC-16-06 a game won through a high tie-break keeps the tied loser of it among the rest", function()
@@ -595,6 +619,17 @@ describe("View", function()
 
 			it("AC-16-08 the subtitle is View.Subtitle", function()
 				assert.are.equal("Raid chat, 100g per person, roll 1-100", View.Result(finished, "Eve").subtitle)
+			end)
+
+			it("AC-16-10 shows full names, surname included; (you) still matches the character name", function()
+				finished.fullNames.Alice = "Alice Vale"
+				finished.fullNames.Dan = "Dan Shards"
+				finished.fullNames.Eve = "Eve Moon"
+				local model = View.Result(finished, "Eve")
+				assert.are.equal("Alice Vale", model.winner)
+				assert.are.same({ name = "Alice Vale", you = false, value = "97", mark = "high" }, model.rows[1])
+				assert.are.same({ name = "Eve Moon", you = true, value = "55", mark = "" }, model.rows[5])
+				assert.are.same({ { text = "Dan Shards owes Alice Vale", you = false, amount = "89g" } }, model.debts)
 			end)
 		end)
 	end)

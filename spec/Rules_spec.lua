@@ -119,7 +119,7 @@ describe("Rules", function()
 			assert.is_nil(game.high)
 			assert.is_nil(game.low)
 			assert.is_nil(game.winner)
-			assert.is_nil(game.loser)
+			assert.is_nil(game.losers)
 			assert.is_nil(game.owed)
 			assert.is_nil(game.endedAt)
 			assert.is_nil(game.cancelReason)
@@ -280,12 +280,12 @@ describe("Rules", function()
 			assert.are.same({ { type = "rolled", name = "Bob", roll = 61, waiting = 1 } }, R(game, "Bob", 61, t + 3))
 			assert.are.same({
 				{ type = "rolled", name = "Carl", roll = 8, waiting = 0 },
-				{ type = "winner", name = "Alice", loser = "Carl", high = 97, low = 8, owed = 890000 },
+				{ type = "winner", name = "Alice", losers = { "Carl" }, high = 97, low = 8, owed = 890000 },
 			}, R(game, "Carl", 8, t + 4))
 			assert.are.equal("finished", game.phase)
 			assert.are.equal(890000, game.owed)
 			assert.are.equal("Alice", game.winner)
-			assert.are.equal("Carl", game.loser)
+			assert.are.same({ "Carl" }, game.losers)
 			assert.are.equal(97, game.high)
 			assert.are.equal(8, game.low)
 			assert.are.equal(t + 4, game.endedAt)
@@ -337,7 +337,7 @@ describe("Rules", function()
 			R(game, "Bob", 61, t + 2)
 			assert.are.same({
 				{ type = "satOut", names = { "Carl" } },
-				{ type = "winner", name = "Alice", loser = "Bob", high = 97, low = 61, owed = 360000 },
+				{ type = "winner", name = "Alice", losers = { "Bob" }, high = 97, low = 61, owed = 360000 },
 			}, Rules.Tick(game, t + 45))
 			assert.are.same({ "Carl" }, game.satOut)
 			assert.are.equal("finished", game.phase)
@@ -405,11 +405,11 @@ describe("Rules", function()
 			R(game, "Bob", 20, t + 6)
 			assert.are.same({
 				{ type = "rolled", name = "Carl", roll = 30, waiting = 0 },
-				{ type = "winner", name = "Carl", loser = "Alice", high = 30, low = 10, owed = 200000 },
+				{ type = "winner", name = "Carl", losers = { "Alice" }, high = 30, low = 10, owed = 200000 },
 			}, R(game, "Carl", 30, t + 7))
 			assert.are.equal("finished", game.phase)
 			assert.are.equal("Carl", game.winner)
-			assert.are.equal("Alice", game.loser)
+			assert.are.same({ "Alice" }, game.losers)
 			assert.are.equal(30, game.high)
 			assert.are.equal(10, game.low)
 			assert.are.equal(200000, game.owed)
@@ -427,7 +427,7 @@ describe("Rules", function()
 			}, events)
 			assert.are.equal("rolling", game.phase)
 			assert.is_nil(game.winner)
-			assert.are.equal("Carl", game.loser)
+			assert.are.same({ "Carl" }, game.losers)
 			assert.are.equal(97, game.high)
 			assert.are.equal(8, game.low)
 			assert.are.same({ "Alice", "Dan" }, game.rollers)
@@ -450,7 +450,7 @@ describe("Rules", function()
 			assert.are.same({ { type = "rolled", name = "Alice", roll = 30, waiting = 1 } }, R(game, "Alice", 30, t + 5))
 			assert.are.same({
 				{ type = "rolled", name = "Dan", roll = 70, waiting = 0 },
-				{ type = "winner", name = "Dan", loser = "Carl", high = 97, low = 8, owed = 890000 },
+				{ type = "winner", name = "Dan", losers = { "Carl" }, high = 97, low = 8, owed = 890000 },
 			}, R(game, "Dan", 70, t + 6))
 			assert.are.equal("finished", game.phase)
 			assert.are.equal(70, game.tieRolls.Dan)
@@ -468,17 +468,17 @@ describe("Rules", function()
 				{ type = "tieBreak", high = nil, low = { "Bob", "Carl" }, max = 100, seconds = 45 },
 			}, events)
 			assert.are.equal("Alice", game.winner)
-			assert.is_nil(game.loser)
+			assert.is_nil(game.losers)
 			assert.is_nil(game.tie.high)
 			assert.are.same({ "Bob", "Carl" }, game.tie.low)
 			assert.are.same({ "Bob", "Carl" }, game.rollers)
 			R(game, "Bob", 40, t + 5)
 			assert.are.same({
 				{ type = "rolled", name = "Carl", roll = 20, waiting = 0 },
-				{ type = "winner", name = "Alice", loser = "Carl", high = 97, low = 8, owed = 890000 },
+				{ type = "winner", name = "Alice", losers = { "Carl" }, high = 97, low = 8, owed = 890000 },
 			}, R(game, "Carl", 20, t + 6))
 			assert.are.equal("finished", game.phase)
-			assert.are.equal("Carl", game.loser)
+			assert.are.same({ "Carl" }, game.losers)
 		end)
 
 		it("AC-03-33 breaks a tie on both ends in one round", function()
@@ -494,24 +494,24 @@ describe("Rules", function()
 			assert.are.same({ "Alice", "Bob" }, game.tie.high)
 			assert.are.same({ "Carl", "Dan" }, game.tie.low)
 			assert.is_nil(game.winner)
-			assert.is_nil(game.loser)
+			assert.is_nil(game.losers)
 			R(game, "Alice", 10, t + 5)
 			R(game, "Bob", 20, t + 6)
 			R(game, "Carl", 30, t + 7)
 			assert.are.same({
 				{ type = "rolled", name = "Dan", roll = 5, waiting = 0 },
-				{ type = "winner", name = "Bob", loser = "Dan", high = 97, low = 8, owed = 890000 },
+				{ type = "winner", name = "Bob", losers = { "Dan" }, high = 97, low = 8, owed = 890000 },
 			}, R(game, "Dan", 5, t + 8))
 			assert.are.equal("finished", game.phase)
 			assert.are.equal("Bob", game.winner)
-			assert.are.equal("Dan", game.loser)
+			assert.are.same({ "Dan" }, game.losers)
 		end)
 
 		it("AC-03-34 a tied player who does not roll drops out of the running", function()
 			local game, t = highTieGame()
 			R(game, "Alice", 30, t + 5)
 			assert.are.same({
-				{ type = "winner", name = "Alice", loser = "Carl", high = 97, low = 8, owed = 890000 },
+				{ type = "winner", name = "Alice", losers = { "Carl" }, high = 97, low = 8, owed = 890000 },
 			}, Rules.Tick(game, t + 90))
 			assert.are.equal("finished", game.phase)
 			assert.are.equal("Alice", game.winner)
@@ -530,10 +530,35 @@ describe("Rules", function()
 			local game, t = lowTieGame()
 			R(game, "Bob", 40, t + 5)
 			assert.are.same({
-				{ type = "winner", name = "Alice", loser = "Carl", high = 97, low = 8, owed = 890000 },
+				{ type = "winner", name = "Alice", losers = { "Carl" }, high = 97, low = 8, owed = 890000 },
 			}, Rules.Tick(game, t + 90))
 			assert.are.equal("finished", game.phase)
-			assert.are.equal("Carl", game.loser)
+			assert.are.same({ "Carl" }, game.losers)
+		end)
+
+		it("AC-03-48 when nobody tied for lowest rolls, they all pay", function()
+			local game, t = lowTieGame()
+			assert.are.same({
+				{ type = "winner", name = "Alice", losers = { "Bob", "Carl" }, high = 97, low = 8, owed = 890000 },
+			}, Rules.Tick(game, t + 90))
+			assert.are.equal("finished", game.phase)
+			assert.are.same({ "Bob", "Carl" }, game.losers)
+			assert.are.equal(890000, game.owed)
+		end)
+
+		it("AC-03-49 a both-sides tie-break whose low side nobody rolls finishes once the high side does", function()
+			local game, t = fourPlayerGame()
+			R(game, "Alice", 97, t + 1)
+			R(game, "Bob", 97, t + 2)
+			R(game, "Carl", 8, t + 3)
+			R(game, "Dan", 8, t + 4)
+			R(game, "Alice", 60, t + 5)
+			assert.are.same({
+				{ type = "rolled", name = "Bob", roll = 40, waiting = 2 },
+			}, R(game, "Bob", 40, t + 6))
+			assert.are.same({
+				{ type = "winner", name = "Alice", losers = { "Carl", "Dan" }, high = 97, low = 8, owed = 890000 },
+			}, Rules.Tick(game, t + 90))
 		end)
 
 		it("AC-03-37 several no-shows on the low side roll off against each other", function()
@@ -557,7 +582,7 @@ describe("Rules", function()
 			assert.is_nil(game.tie.high)
 			assert.are.same({}, game.tieRolls)
 			assert.are.equal(t + 50 + 45, game.rollDeadline)
-			assert.is_nil(game.loser)
+			assert.is_nil(game.losers)
 			assert.are.equal("Alice", game.winner)
 		end)
 
@@ -592,7 +617,7 @@ describe("Rules", function()
 				{ type = "tieBreak", high = nil, low = { "Dan", "Eve" }, max = 100, seconds = 45 },
 			}, Rules.Tick(game, t + 50))
 			assert.are.equal("Alice", game.winner)
-			assert.is_nil(game.loser)
+			assert.is_nil(game.losers)
 			assert.are.equal(3, game.round)
 			assert.are.same({ "Dan", "Eve" }, game.rollers)
 			assert.is_nil(game.tie.high)
@@ -610,6 +635,12 @@ describe("Rules", function()
 
 		it("RF-4 rounds a fractional copper down", function()
 			assert.are.equal(300, Rules.Owed(3, 1, 15045, 100))
+		end)
+
+		it("AC-03-50 stays exact when (high - low) * wager passes 2^53", function()
+			-- The plain product rounds to a double and floors to 9648211512.
+			assert.are.equal(9648211511, Rules.Owed(991923, 218, 9650332415, 991923))
+			assert.are.equal(9999989999, Rules.Owed(1000000, 1, 9999999999, 1000000))
 		end)
 	end)
 
@@ -630,6 +661,48 @@ describe("Rules", function()
 			assert.are.same({ { type = "cancelled", reason = "host" } }, Rules.Cancel(tieBreak, t2 + 5))
 			assert.are.equal("cancelled", tieBreak.phase)
 			assert.are.equal("host", tieBreak.cancelReason)
+		end)
+	end)
+
+	describe("FullName", function()
+		it("AC-03-51 is the character name until a fuller one is seen", function()
+			local game = Rules.New(opts, t0)
+			Rules.Join(game, "Forgot", t0 + 1, "Forgot")
+			assert.are.equal("Forgot", Rules.FullName(game, "Forgot"))
+			assert.are.equal("Bob", Rules.FullName(game, "Bob"))
+		end)
+
+		it("AC-03-52 a roll line's surname is kept, and a bare name never replaces it", function()
+			local game = Rules.New(opts, t0)
+			Rules.Join(game, "Forgot", t0 + 1, "Forgot")
+			Rules.Join(game, "Bob", t0 + 2)
+			Rules.Tick(game, t0 + 60)
+			Rules.Roll(game, "Forgot", 50, 1, 100, t0 + 61, "Forgot Shards")
+			assert.are.equal("Forgot Shards", Rules.FullName(game, "Forgot"))
+			Rules.Roll(game, "Forgot", 70, 1, 100, t0 + 62, "Forgot")
+			assert.are.equal("Forgot Shards", Rules.FullName(game, "Forgot"))
+		end)
+
+		it("AC-03-53 joining with a surname keeps it; a stranger's roll is not remembered", function()
+			local game = Rules.New(opts, t0)
+			Rules.Join(game, "Forgot", t0 + 1, "Forgot Shards")
+			Rules.Tick(game, t0 + 60)
+			Rules.Roll(game, "Dan", 50, 1, 100, t0 + 61, "Dan Stranger")
+			assert.are.equal("Forgot Shards", Rules.FullName(game, "Forgot"))
+			assert.are.equal("Dan", Rules.FullName(game, "Dan"))
+			assert.is_nil(game.fullNames.Dan)
+		end)
+
+		it("AC-03-54 opts.fullNames gives the host's full name from the start", function()
+			local withHost = {}
+			for k, v in pairs(opts) do
+				withHost[k] = v
+			end
+			withHost.fullNames = { Alice = "Alice Vale" }
+			local game = Rules.New(withHost, t0)
+			assert.are.equal("Alice Vale", Rules.FullName(game, "Alice"))
+			withHost.fullNames = "Alice Vale"
+			assert.has_error(function() Rules.New(withHost, t0) end)
 		end)
 	end)
 
@@ -690,7 +763,7 @@ describe("Rules", function()
 			)
 			assert.are.same({
 				{ type = "rolled", name = "Carl", roll = 8, waiting = 0 },
-				{ type = "winner", name = "Alice", loser = "Carl", high = 97, low = 8, owed = 890000 },
+				{ type = "winner", name = "Alice", losers = { "Carl" }, high = 97, low = 8, owed = 890000 },
 			}, Rules.Roll(game, "Carl", 8, 1, 100, t + 26))
 		end)
 	end)
@@ -752,7 +825,7 @@ describe("Rules", function()
 			assert.are.same({ "Eve" }, game.satOut)
 			assert.are.same({ "Alice", "Dan" }, game.rollers)
 			assert.is_nil(game.winner)
-			assert.are.equal("Carl", game.loser)
+			assert.are.same({ "Carl" }, game.losers)
 			assert.are.equal(97, game.high)
 			assert.are.equal(8, game.low)
 			assert.are.equal(t + 90, game.rollDeadline)
@@ -771,13 +844,13 @@ describe("Rules", function()
 				Rules.Tick(game, t + 86)
 			)
 			assert.are.same({
-				{ type = "winner", name = "Alice", loser = "Carl", high = 97, low = 8, owed = 890000 },
+				{ type = "winner", name = "Alice", losers = { "Carl" }, high = 97, low = 8, owed = 890000 },
 			}, Rules.Tick(game, t + 90))
 
 			-- Finished.
 			assert.are.equal("finished", game.phase)
 			assert.are.equal("Alice", game.winner)
-			assert.are.equal("Carl", game.loser)
+			assert.are.same({ "Carl" }, game.losers)
 			assert.are.equal(890000, game.owed)
 			assert.are.equal(t + 90, game.endedAt)
 			assert.is_nil(game.tie)
@@ -840,7 +913,7 @@ describe("Rules", function()
 			assert.are.same({ { type = "rolled", name = "Carl", roll = 10, waiting = 1 } }, R(game, "Carl", 10, t0 + 2))
 			assert.are.same({
 				{ type = "satOut", names = { "Alice" } },
-				{ type = "winner", name = "Bob", loser = "Carl", high = 90, low = 10, owed = 800000 },
+				{ type = "winner", name = "Bob", losers = { "Carl" }, high = 90, low = 10, owed = 800000 },
 			}, Rules.Tick(game, t0 + 15))
 		end)
 

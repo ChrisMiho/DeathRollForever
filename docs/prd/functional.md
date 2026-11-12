@@ -32,7 +32,7 @@ Non-goals (planned for later versions, see the
 - Tracking who has paid, trade detection, `/dr owed`.
 - Settings, saved variables, history, stats, resuming after `/reload`.
 - Auto-roll, kick, extend, `/dr join`.
-- Several rounds per game, side bets, more than one loser.
+- Several rounds per game, side bets.
 
 ## 3. Roles
 
@@ -86,7 +86,8 @@ The highest roll wins and the lowest roll pays. The loser owes the winner
 default roll max of 100 that is the gap in percent of the wager: 90 against
 80 on 100g owes 10g; 99 against 2 owes 97g. The addon posts one line with
 the winner, the loser, both rolls and the amount. The game is over; nothing
-is remembered.
+is remembered. There is more than one loser only when everyone tied for
+lowest skipped the tie-break (4.5): each of them owes the full amount.
 
 If every roll was the same, nobody won: the addon says so and everyone
 rolls again.
@@ -99,8 +100,12 @@ still sets the amount. Both ends can be tied at once; the tied players on
 both ends roll in the same 45-second tie-break. A tied player who does not
 roll in time takes the worse outcome: in a tie for highest they drop out of
 the running, in a tie for lowest they pay. Several no-shows on the low side
-roll off against each other. If nobody on a tied side rolls at all, the
-game is cancelled with a line saying so.
+roll off against each other. If nobody tied for lowest rolls at all, they
+all pay: each owes the winner the full amount. If nobody tied for highest
+rolls at all, the game is cancelled with a line saying so.
+
+A player who rolls the wrong range gets a whisper telling them the range
+to roll; the game's chat sees nothing.
 
 ### 4.6 Cancel
 
@@ -180,6 +185,10 @@ new check.
 | 2026-11-06 | Not rolling means sitting out, and fewer than 2 rolls cancels | Nobody pays for being away; one roll decides nothing |
 | 2026-11-06 | Ties at the top or bottom re-roll among the tied; the amount stays | The host wanted forced re-rolls; the original roll is what everyone saw |
 | 2026-11-06 | In a tie-break a no-show takes the worse outcome; a side nobody rolls cancels | No way to dodge a low tie by going quiet; no endless re-rolls among the absent |
+| 2026-11-11 | When nobody tied for lowest rolls the tie-break, they all pay the full amount; only a high side nobody rolls still cancels | Two players tied for lowest could cancel the debt by both going quiet |
+| 2026-11-11 | A wrong range is whispered to the player, not posted | Assumes an honest slip, keeps the chat clean, and someone who spams wrong rolls only spams themself |
+| 2026-11-11 | A chat line that would pass 255 characters gives a count instead of the names | Big guild games would cut lines off; the window still shows every name |
+| 2026-11-11 | Players are matched by character name, without the Forever surname or realm, and shown with the surname once seen | Joins come from the chat sender, rolls from the roll line; only the character name is in both. The host wanted surnames kept on screen |
 | 2026-11-06 | An all-equal round is rerun | Nobody can win or lose on a gap of zero |
 | 2026-11-06 | Roll time 45 s with reminders naming who has not rolled | Same pace as the old turn; the names make the call-out easy |
 | 2026-11-06 | `/dr` opens the window; `/dr help` lists the commands | The host found `/dr show` awkward; the window is the common case |

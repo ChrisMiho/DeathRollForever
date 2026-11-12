@@ -1,16 +1,16 @@
 # 02 Chat parsing: join words, roll results, `/dr` arguments
 
-Status: draft v3.1 (v1 with the `rollMax` argument, plus `solo`). Last verified against code: not yet. Owns `src/Parse.lua`, `spec/Parse_spec.lua`.
+Status: draft v3.1 (v1 with the `rollMax` argument, plus `solo`; `PlayerName` and `RollPattern` added 2026-11-11). Last verified against code: not yet. Owns `src/Parse.lua`, `spec/Parse_spec.lua`.
 
 ## Purpose and scope
 
 Recognise the three kinds of text the host's addon reads: a join word in the
 game's chat, a `/roll` result in the system channel, and the arguments the
-host typed after `/dr`. Pure Lua, no WoW API. The glue (05) hands in strings
+host typed after `/dr`; and reduce a chat sender or a roll line's name to
+the character name every module compares. Pure Lua, no WoW API. The glue (05) hands in strings
 and gets back values or `nil, errorText`.
 
-Out of scope: deciding what to do with the result (03, 05), realm stripping
-(05 does it with `Ambiguate` before calling in).
+Out of scope: deciding what to do with the result (03, 05).
 
 ## Depends on / blocks
 
@@ -39,6 +39,27 @@ True when `message`, with leading and trailing spaces removed, equals
 with the three numbers as integers, or `nil` when the message does not match.
 The name is returned as captured; it may contain a realm, which the caller
 strips.
+
+### `Parse.PlayerName(text)`
+
+The character name a player is known by: the first run of characters that
+is neither a space nor a hyphen, after leading spaces. WoW Forever prints a
+surname after the character name in roll lines (`Forgot Shards`), and chat
+senders carry a realm (`Forgot-Stormrage`); character names have neither a
+space nor a hyphen, so both give `Forgot`. Joins come from the chat sender
+and rolls from the roll line, so this is what makes a joined player's roll
+count. The second return is the name to show: the text up to the realm,
+trimmed, surname kept (`Forgot Shards`; `Forgot` for a sender without
+one). Non-string or blank text gives `nil`.
+
+### `Parse.RollPattern(format)`
+
+Turns a roll-result format string like the client's `RANDOM_ROLL_RESULT`
+(`%s rolls %d (%d-%d)` in English) into a pattern for `Parse.Roll`: `^` and
+`$` around it, `%s` as `(.-)`, each `%d` as `(%d+)`, every other character
+literal. Returns `nil` unless the format has exactly one `%s`, before
+exactly three `%d`, and no positional arguments (`%1$s`); 05 then falls
+back to `ROLL_PATTERN`. The English format gives exactly `ROLL_PATTERN`.
 
 ### `Parse.Command(text)`
 
@@ -109,6 +130,14 @@ Edits `src/Parse.lua` and `spec/Parse_spec.lua` (v3: `startRoll` becomes `rollMa
 | AC-02-22 | `StartArgs("g", {"1g", "500", "extra"})` | `nil, Parse.USAGE` |
 | AC-02-23 | `StartArgs("solo", {"1g"})`, `("solo", {"50s", "1000"})` | `{ channel="SOLO", wager=10000, rollMax=nil }`, `{ channel="SOLO", wager=5000, rollMax=1000 }` |
 | AC-02-24 | `StartArgs("s", {"1g"})`, `StartArgs("solo", {"1g", "100", "10"})` | `nil, Parse.USAGE` (no short form; no bot count) |
+| AC-02-25 | `PlayerName("Alice")` | `"Alice"` |
+| AC-02-26 | `PlayerName("Forgot Shards")`, `("Forgot-Stormrage")`, `("Forgot Shards-Stormrage")`, `("  Forgot ")` | `"Forgot"` each |
+| AC-02-27 | `PlayerName("Zoë Vale")` | `"Zoë"` |
+| AC-02-28 | `PlayerName("")`, `("   ")`, `(nil)` | `nil` |
+| AC-02-29 | `RollPattern("%s rolls %d (%d-%d)")` | `Parse.ROLL_PATTERN` |
+| AC-02-32 | `PlayerName("Forgot Shards")`, `(" Forgot Shards-Stormrage ")`, `("Forgot-Stormrage")`, `("Alice")` | `"Forgot", "Forgot Shards"` twice, then `"Forgot", "Forgot"`, `"Alice", "Alice"` |
+| AC-02-30 | `RollPattern("%s würfelt. Ergebnis: %d (%d-%d)")`, then `Roll` with it | reads `Forgot Shards würfelt. Ergebnis: 42 (1-100)` as `"Forgot Shards", 42, 1, 100`; the English line gives `nil` |
+| AC-02-31 | `RollPattern(nil)`, `("%1$s rolls %2$d (%3$d-%4$d)")`, `("%d rolls %s (%d-%d)")`, `("%s rolls %d")`, `("nothing here")` | `nil` each |
 
 ### In-game (manual)
 

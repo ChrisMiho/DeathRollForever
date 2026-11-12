@@ -24,7 +24,7 @@ them were answered during v1 and v2:
 
 | Tag | Check | Answer |
 |-----|-------|--------|
-| `[P0-ROLL]` | Exact text of the system message for `/roll` | `Name rolls N (1-M)` for everyone, never "You". The name is the WoW Forever display name with the surname (`Forgot Shards`), so the capture is `(.-)`, not `(%S+)`. `UnitName("player")` leaves the surname out (`Forgot`); `GetUnitName("player", true)` and `UnitFullName("player")` include it (checked in game 2026-11-10) |
+| `[P0-ROLL]` | Exact text of the system message for `/roll` | `Name rolls N (1-M)` for everyone, never "You". The name is the WoW Forever display name with the surname (`Forgot Shards`), so the capture is `(.-)`, not `(%S+)`. `UnitName("player")` leaves the surname out (`Forgot`); `GetUnitName("player", true)` and `UnitFullName("player")` include it (checked in game 2026-11-10). Since 2026-11-11 every name goes through `Parse.PlayerName`, which keeps the character name only, so a join (chat sender) and a roll (roll line) match whether or not either carries the surname |
 | `[P0-POST]` | Addon code can post to guild, party and raid chat from a slash command and from a timer | Works in guild and party, direct and from a timer |
 | `[P0-DISTANCE]` | The host sees the roll of a far-away, ungrouped guild member | Not seen ungrouped, seen when grouped; the kickoff line tells players to stay near the host |
 | `[P0-AUTOROLL]` | Addon code can call `RandomRoll` from a timer | Works |
@@ -89,10 +89,14 @@ functions), never at file load, so load order only matters for `Init.lua`.
 
 ## 2. Conventions
 
-- **Names.** A player is identified by character name without realm, as
-  returned by `Ambiguate(name, "short")`. Comparisons are exact string
-  comparisons. Glue code strips the realm at the boundary; pure modules never
-  see a realm.
+- **Names.** A player is identified by character name, without the
+  Forever surname and without realm, as returned by `Parse.PlayerName`.
+  Comparisons are exact string comparisons. Glue code reduces every chat
+  sender, roll-line name and the host's own name with it at the boundary;
+  pure modules never see a realm, and compare no surname. Each player's
+  name to show, surname kept, rides along into `game.fullNames`, and every
+  name a player sees, in chat or the window, is `Rules.FullName(game,
+  name)`.
 - **Money** is an integer number of copper. 1g = 10,000c, 1s = 100c.
 - **Time** is seconds as a float from `GetTime()`. Pure modules take `now` as
   a parameter; they never call a clock.
@@ -178,11 +182,16 @@ game = {
 	high        = nil,                  -- the winning roll, set when the main round settles
 	low         = nil,                  -- the losing roll, set with high
 	winner      = nil,                  -- name; set as soon as the top is decided
-	loser       = nil,                  -- name; set as soon as the bottom is decided
-	owed        = nil,                  -- copper the loser owes the winner, set when phase == "finished"
+	losers      = nil,                  -- { names }; set as soon as the bottom is decided. One name, or every
+	                                    -- player tied for lowest when none of them rolled the tie-break
+	owed        = nil,                  -- copper each loser owes the winner, set when phase == "finished"
 	satOut      = {},                   -- names that did not roll in a main round, in join order
 	endedAt     = nil,
 	cancelReason = nil,                 -- "host" | "tooFew" | "noRolls", set when phase == "cancelled"
+
+	-- Names to show
+	fullNames   = { Forgot = "Forgot Shards" },   -- character name -> name with the Forever surname, for
+	                                    -- joined players and the host; a surname, once seen, is kept
 }
 ```
 
@@ -200,8 +209,9 @@ Invariants:
 - `high` and `low` are set when the main round settles with at least
   `MIN_PLAYERS` rolls and not all equal. They never change afterwards: a
   tie-break decides who among the tied wins or pays, not the amount.
-- `winner` and `loser` are set as soon as their end is decided, which may be
-  before the other end is. `phase == "finished"` exactly when both are set.
+- `winner` and `losers` are set as soon as their end is decided, which may
+  be before the other end is. `phase == "finished"` exactly when both are
+  set.
 - `owed = Rules.Owed(high, low, wager, rollMax)` when finished.
 
 ## 5. Public interfaces
@@ -231,9 +241,12 @@ and any amount outside `MIN..MAX`, returns `nil, Money.ERROR`.
 ### 5.2 `ns.Parse`
 
 ```lua
-Parse.ROLL_PATTERN    = "^(.-) rolls (%d+) %((%d+)%-(%d+)%)$"   -- [P0-ROLL]; names may contain spaces
+Parse.ROLL_PATTERN    = "^(.-) rolls (%d+) %((%d+)%-(%d+)%)$"   -- [P0-ROLL]; names may contain spaces; the English fallback
 Parse.JoinWord(message, joinWord) -> boolean
 Parse.Roll(systemMessage, pattern) -> name, roll, min, max | nil   -- pattern defaults to ROLL_PATTERN
+Parse.RollPattern(format) -> pattern | nil      -- a pattern for Roll from a format like RANDOM_ROLL_RESULT
+Parse.PlayerName(text) -> name, fullName | nil  -- the character name (first word, no surname, no realm),
+                                                -- and the name to show (surname kept, no realm)
 Parse.Command(text)   -> { name = "g", args = { "1g", "500" } }     -- never fails; "" gives name ""
 Parse.StartArgs(name, args) -> { channel = "GUILD", wager = 10000, rollMax = 500 or nil } | nil, errorText
                                                -- rollMax is nil when not given; Host fills the default
@@ -251,39 +264,46 @@ a second roll in the same round) returns an empty list and changes nothing.
 ```lua
 Rules.New(opts, now)                           -> game, events   -- events is { kickoff }, or { call } with players
    -- opts = { host, channel, wager, rollMax, joinWord, joinTime, rollTime }, all required,
+   -- optional fullNames = { [name] = fullName } (the host's own),
    -- and optional players = { names }: at least MIN_PLAYERS different names; the game skips
    -- the lobby and starts in rolling with joined = players (solo games)
-Rules.Join(game, name, now)                    -> events   -- lobby only
+Rules.Join(game, name, now, fullName)          -> events   -- lobby only; fullName optional, to show
 Rules.Tick(game, now)                          -> events   -- countdowns, close, reminders, a round settling on its deadline
-Rules.Roll(game, name, roll, min, max, now)    -> events   -- rolling only
+Rules.Roll(game, name, roll, min, max, now, fullName) -> events   -- rolling only; fullName optional, to show
 Rules.Cancel(game, now)                        -> events   -- lobby or rolling
 Rules.Waiting(game)                            -> { names }   -- rollers who have not rolled this round, in order; {} outside rolling
-Rules.Owed(high, low, wager, rollMax)          -> copper   -- math.floor((high - low) * wager / rollMax)
+Rules.Owed(high, low, wager, rollMax)          -> copper   -- math.floor((high - low) * wager / rollMax), exact
 Rules.IsLive(game)                             -> boolean  -- phase is lobby or rolling
+Rules.FullName(game, name)                     -> fullName -- game.fullNames[name], else name
 ```
 
 `Rules.Owed` is pure arithmetic on integers. With the default `rollMax` of
 100 it is the percentage of the wager that the gap between the two rolls
-makes: 97 against 8 on 100g owes 89g. Known limit: the product
-`(high - low) * wager` exceeds 2^53 only for a wager near `Money.MAX` with a
-`rollMax` near its maximum; nobody plays that.
+makes: 97 against 8 on 100g owes 89g. It splits the wager by `rollMax`
+first, so the result is exact even where the plain product `(high - low) *
+wager` would pass 2^53.
 
 ### 5.4 `ns.Chat`
 
 ```lua
 Chat.PREFIX           = "[DeathRoll]"
+Chat.MAX_LINE         = 255                               -- bytes per chat line, prefix included
 Chat.Prefix(text)     -> "[DeathRoll] " .. text
-Chat.Render(event, game) -> { line, ... }                -- prefixed chat lines for one event; may be empty
+Chat.Render(event, game) -> { line, ... }                -- prefixed chat lines for one event; may be empty;
+                                                         -- a line that would pass MAX_LINE gives counts, not names
+Chat.WhisperTo(event) -> name | nil                      -- whisper the lines to this player; nil: the game's chat
 ```
 
 ### 5.5 `ns.Host`
 
 ```lua
 Host.Start(opts)      -> true | nil, errorText   -- opts from Parse.StartArgs or View.StartOpts; fills defaults
+                                                 -- into a table of its own and never changes opts
                                                  -- opts.bots: bot count for a "SOLO" game, nil means Solo.BOTS
 Host.Cancel()         -> true | nil, errorText
 Host.IsHosting()      -> boolean
 Host.Game()           -> game | nil
+Host.PlayerName()     -> name, fullName  -- Parse.PlayerName(GetUnitName("player", true))
 Host.OnChange(fn)     -> nil   -- registers the one listener; a second call replaces it
 ```
 
@@ -310,7 +330,7 @@ View.Lobby(game, host, now)  -> { subtitle, secondsLeft, fraction, count, rows =
 View.Game(game, host, now)   -> { subtitle, header = { label, count }, rows = { { name, you, value, tag, mark } },
                                   status, secondsLeft, fraction, button = { label, enabled, max } }
 View.Result(game, host)      -> { subtitle, winner, winningRoll, rows = { { name, you, value, mark } },
-                                  debt = { text, you, amount } }
+                                  debts = { { text, you, amount }, ... } }   -- one per loser
 ```
 
 Row `mark` is one of `""` (plain), `"high"` (tinted as the highest),
@@ -359,13 +379,13 @@ use of `rng`.
 | `closed` | `joined` | close with enough players |
 | `call` | `names`, `max`, `seconds` | a main round starts: everyone in `names` rolls `1-max` within `seconds` |
 | `rolled` | `name`, `roll`, `waiting` | a valid roll was counted; `waiting` is how many rollers are still to roll (no chat text) |
-| `wrongRange` | `name`, `max` | a roller rolled another range |
+| `wrongRange` | `name`, `max` | a roller rolled another range; whispered to `name` (`Chat.WhisperTo`) |
 | `reminder` | `names`, `secondsLeft`, `max` | a marker in `REMINDERS` was passed; `names` are still to roll |
 | `satOut` | `names` | a main round settled with players who did not roll |
 | `allTied` | `roll`, `names` | every roll of a main round was the same; a new main round follows |
 | `tieBreak` | `high`, `low`, `max`, `seconds` | a tie-break round starts; `high` and `low` are the tied names or nil |
-| `winner` | `name`, `loser`, `high`, `low`, `owed` | both ends decided |
-| `cancelled` | `reason` | `Cancel` (`"host"`), close or a main round with too few (`"tooFew"`), a tie-break side nobody rolled (`"noRolls"`) |
+| `winner` | `name`, `losers`, `high`, `low`, `owed` | both ends decided; `losers` is a list of one name, or of every player tied for lowest when none of them rolled the tie-break; `owed` is what each owes |
+| `cancelled` | `reason` | `Cancel` (`"host"`), close or a main round with too few (`"tooFew"`), a tie for highest nobody rolled (`"noRolls"`) |
 
 The order inside one returned list is the order to post. Examples: a close
 returns `closed, call`; the last roll of a main round returns `rolled,
@@ -382,10 +402,11 @@ be in `.luacheckrc` `read_globals`.
 | API | Used for |
 |-----|----------|
 | `SendChatMessage(text, channel)` | posting every rendered line `[P0-POST]` |
+| `SendChatMessage(text, "WHISPER", nil, name)` | the lines `Chat.WhisperTo` sends to one player (a wrong range) |
 | `CHAT_MSG_GUILD`, `CHAT_MSG_PARTY`, `CHAT_MSG_PARTY_LEADER`, `CHAT_MSG_RAID`, `CHAT_MSG_RAID_LEADER` | join words; only the game's channel is listened to |
 | `CHAT_MSG_SYSTEM` | roll results `[P0-ROLL]` `[P0-DISTANCE]` |
-| `Ambiguate(name, "short")` | stripping the realm from chat senders |
-| `GetUnitName("player", true)` | the host's own name with the Forever surname, as roll lines print it `[P0-ROLL]`. Never `UnitName`: it leaves the surname out, and the host's own roll would not match |
+| `GetUnitName("player", true)` | the host's own name, reduced by `Parse.PlayerName` in `Host.PlayerName` `[P0-ROLL]` |
+| `RANDOM_ROLL_RESULT` | the client's roll-line format, turned into the roll pattern by `Parse.RollPattern` |
 | `IsInGuild()`, `IsInGroup()`, `IsInRaid()` | refusing a start in a chat the host is not in |
 | `GetTime()` | `now` |
 | `C_Timer.NewTicker(1, fn)` | the 1-second tick while a game is live |
@@ -399,7 +420,7 @@ Used by `src/UI.lua` only:
 | `UIParent` | parent of the window |
 | `CreateFrame` with the templates `BackdropTemplate`, `InputBoxTemplate`, `UIPanelScrollFrameTemplate` (strings, not globals) | the window, edit boxes, list boxes `[P0-TEMPLATES]` |
 | `UnitFactionGroup("player")` | the tint and the footer `[P0-FACTION]` |
-| `GetUnitName("player", true)`, `Ambiguate` | the host's name, for `(you)` and the host's own roll |
+| `Host.PlayerName()` (not a game API) | the host's name, for `(you)` |
 | `RandomRoll(1, max)` | the Roll button `[P0-CLICKROLL]` |
 | `GetTime()` | `now` for every draw |
 | `PLAYER_LOGIN` | registering the `Host.OnChange` listener |
@@ -418,7 +439,7 @@ decisions do not block them.
 - **v4 sync.** AceComm prefix `DeathRollF`, a pure codec, SNAPSHOT of the
   whole `game` after every change plus a heartbeat. `game.id` exists for this.
 - **v5 ledger and trades.** `ns.Ledger` built from a finished `game`:
-  `winner`, `loser` and `owed` are all it needs. Trade window detection
+  `winner`, `losers` and `owed` are all it needs. Trade window detection
   marks the debt paid.
 - **v6 settings, history, stats.** SavedVariables `DeathRollForeverDB` with a
   version number; `Rules.DEFAULTS` becomes the defaults table.
@@ -441,9 +462,9 @@ decisions do not block them.
 | Call | The line that tells everyone to roll and what to type |
 | Waiting | A roller who has not rolled yet this round |
 | Sat out | A player who did not roll in a main round. Owes nothing, wins nothing |
-| Highest, lowest | The top and bottom main-round rolls. The highest wins, the lowest pays |
+| Highest, lowest | The top and bottom main-round rolls. The highest wins, the lowest pays; when everyone tied for lowest skips the tie-break, they all pay |
 | Owed | `(highest - lowest) * wager / rollMax`, rounded down to copper |
-| Wager | The stake per person, in copper. The most the loser can owe |
+| Wager | The stake per person, in copper. The most a loser can owe |
 | State | What the window shows: form, lobby, rolling or winner |
 | Tint | The faction colours on the title bar, bars, highest row and main button; `low` is the lowest row's colour |
 | View model | A plain table `ns.View` builds for `ns.UI` to draw |

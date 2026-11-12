@@ -1,6 +1,6 @@
 # 05 Host controller: slash commands, chat in, lines out, the ticker
 
-Status: draft v3.1 (v3 plus solo games, see 06-solo). Last verified against code: not yet. Owns `src/Host.lua`, `src/Init.lua`.
+Status: draft v3.1 (v3 plus solo games, see 06-solo; names, whispers and the client's roll text 2026-11-11). Last verified against code: not yet. Owns `src/Host.lua`, `src/Init.lua`.
 
 ## Purpose and scope
 
@@ -42,22 +42,44 @@ loaded line ends with `Type /dr.`, which now opens the window.
 2. Check membership: `GUILD` needs `IsInGuild()`, `PARTY` needs
    `IsInGroup()`, `RAID` needs `IsInRaid()`. Otherwise return `nil,
    NOT_IN_<channel>`. `SOLO` needs nothing.
-3. Fill `opts.rollMax` from `Rules.DEFAULTS` when nil, and add `host =
-   Ambiguate(GetUnitName("player", true), "short")` (the name with the
-   Forever surname, as roll lines print it `[P0-ROLL]`), `joinWord`, `joinTime`,
-   `rollTime` from `Rules.DEFAULTS`.
-   For `SOLO`: `rollTime = Solo.ROLL_TIME`, and `opts.players =
-   Solo.Players(host, UnitFactionGroup("player"), opts.bots or Solo.BOTS,
-   math.random)`. `opts.bots` is dropped before `Rules.New`.
-4. `game, events = Rules.New(opts, GetTime())`. Keep `game` in a local.
-5. Register the chat events for that channel only (table in contracts
+3. The first `Start` builds the roll pattern: `Parse.RollPattern(
+   RANDOM_ROLL_RESULT)`, or `Parse.ROLL_PATTERN` when that gives `nil`, so a
+   client in another language reads rolls too. Kept for the session.
+4. Build the `Rules.New` options in a new table (the caller's table is
+   never changed): `channel` and `wager` from the caller, `rollMax` from
+   the caller or `Rules.DEFAULTS`, `host = Host.PlayerName()`, and
+   `joinWord`, `joinTime`, `rollTime` from `Rules.DEFAULTS`.
+   For `SOLO`: `rollTime = Solo.ROLL_TIME`, and `players =
+   Solo.Players(host, UnitFactionGroup("player"), bots or Solo.BOTS,
+   math.random)` with the caller's `bots`.
+5. `game, events = Rules.New(opts, GetTime())`. Keep `game` in a local.
+6. Register the chat events for that channel only (table in contracts
    section 7; none for `SOLO`) and `CHAT_MSG_SYSTEM`. Start
    `C_Timer.NewTicker(1, tick)`. Post the events (below), so the listener
    sees a game whose ticker is already running. Return `true`.
 
+### `Host.PlayerName()`
+
+`Parse.PlayerName(GetUnitName("player", true))`: the host's character
+name, without the Forever surname `GetUnitName` adds. The window uses it
+for `(you)`; `Start` uses it as `host`.
+
+### Names
+
+Every player is known by `Parse.PlayerName`: a join by the chat sender's,
+a roll by the roll line's. The sender carries a realm and the roll line a
+Forever surname; both reduce to the character name, so a joined player's
+roll matches whichever way the client writes the name. The second value of
+`Parse.PlayerName`, the name with the surname, goes to `Rules.Join` and
+`Rules.Roll` as `fullName`, and `Start` passes the host's own as
+`fullNames = { [host] = hostFullName }`, so chat and the window show
+surnames.
+
 ### Post (internal)
 
 For each event in order, for each line of `Chat.Render(event, game)`:
+`SendChatMessage(line, "WHISPER", nil, name)` when `Chat.WhisperTo(event)`
+gives a name (a wrong range, to the player who rolled it), else
 `SendChatMessage(line, game.channel)` `[P0-POST]`. A `SOLO` game sends
 nothing and prints nothing: no `Chat.Render`, no `SendChatMessage`, no
 `ns.Print`. Then, for a `SOLO` game, schedule the bots (below) if the list
@@ -79,13 +101,13 @@ that schedules the next bot rolls.
 ### Chat events
 
 - Channel message `(text, sender)`: only while hosting. `name =
-  Ambiguate(sender, "short")`. If `Parse.JoinWord(text, game.joinWord)`:
-  post `Rules.Join(game, name, GetTime())`.
-- `CHAT_MSG_SYSTEM (text)`: only while hosting. `name, roll, min, max =
-  Parse.Roll(text)`; if nil, ignore. `[P0-ROLL]`: the host's own roll shows
-  with the host's name like everyone else's, never as "You", so no mapping
-  is needed. `name = Ambiguate(name, "short")`. Post `Rules.Roll(game,
-  name, roll, min, max, GetTime())`.
+  Parse.PlayerName(sender)`. If `name` and `Parse.JoinWord(text,
+  game.joinWord)`: post `Rules.Join(game, name, GetTime())`.
+- `CHAT_MSG_SYSTEM (text)`: only while hosting. `rawName, roll, min, max =
+  Parse.Roll(text, rollPattern)`, `name = Parse.PlayerName(rawName)`; if
+  nil, ignore. `[P0-ROLL]`: the host's own roll shows with the host's name
+  like everyone else's, never as "You", so no mapping is needed. Post
+  `Rules.Roll(game, name, roll, min, max, GetTime())`.
 
 ### Tick
 
@@ -137,7 +159,8 @@ not handled; the host cancels. A later version may detect `GROUP_LEFT`.
 | `WINDOW_ERROR` | `Window error (the game goes on in chat): <error text>` |
 | unknown command | `Unknown command.` followed by the help lines |
 
-Help lines, printed one per `ns.Print`:
+Help lines, printed one per `ns.Print`. The bot count in the solo line is
+`Solo.BOTS`, filled in when the list prints:
 
 ```
 /dr                          open the window
@@ -190,14 +213,16 @@ party with two alts on second accounts. Note what you see against each line.
 | IG-05-10 | you and two others type `1`; one types `1` twice; one types `one` | countdown lines at 30, 15, 5 showing 3 names in the order typed `[P0-POST]` from a timer |
 | IG-05-11 | wait for 0 | `Joining closed! 3 players in: ...`, then `Everyone, type /roll 100 now! 45 seconds.` |
 | IG-05-12 | someone who did not join types `/roll 100` | nothing posted |
-| IG-05-13 | a player types `/roll 50` | `..., wrong range. Type /roll 100` |
+| IG-05-13 | a player types `/roll 50` | that player gets a whisper from you: `[DeathRoll] Wrong range, that roll does not count. Type /roll 100`; nothing in the game's chat |
 | IG-05-14 | a player types `/roll 100` twice | nothing posted for either; the first number is the one in the window |
 | IG-05-15 | you, as host, roll | your own roll counts `[P0-ROLL]` |
+| IG-05-15b | a character with a Forever surname types `1`, then `/roll 100` | their roll counts: no sit-out line for them, the window shows their full name with the surname and the roll, and the result line names them with the surname |
 | IG-05-16 | one player waits | `20 seconds! Still to roll: <name>. Type /roll 100`, then 10, then 5, then `<name> did not roll in time and sits out.` and the result line |
 | IG-05-17 | everyone rolls | the result line at once: `WINNER: <name> with <n>! <name> rolled <m> and owes <winner> <amount>.` and no further lines; `/dr g 1g` starts a new game |
 | IG-05-18 | two players roll the same highest number (keep rolling games until it happens, or use `/roll 2`-style low roll max: `/dr g 1g 2`) | `Tie for highest: A, B. Tied players, type /roll 2 again! 45 seconds.`; only their rolls count; then the result |
 | IG-05-19 | `/dr g 1g 2` with three players | a tie on one or both ends almost every time; check the lines for a low tie and for both ends |
-| IG-05-20 | in a tie-break, the tied players do not roll | `Nobody rolled the tie-break. Game cancelled.` |
+| IG-05-20 | in a tie for highest, the tied players do not roll | `Nobody rolled the tie for highest. Game cancelled.` |
+| IG-05-20b | in a tie for lowest, the tied players do not roll | `WINNER: <name> with <n>! <A> and <B> rolled <m>, skipped the tie-break and each owe <winner> <amount>.` |
 | IG-05-21 | `/dr g 1g`, then `/dr cancel` during the lobby, and again during rolling | `Game cancelled by the host.` each time; no more countdown or reminder lines afterwards |
 | IG-05-22 | `/dr g 1g`, nobody joins | at 0: `Not enough players (need 2). Game cancelled.` |
 | IG-05-23 | `/dr g 1g`, two join, nobody rolls | the sits-out line naming both, then `Not enough players (need 2). Game cancelled.` |

@@ -168,7 +168,7 @@ calls `Show()`.
 Implements contracts 5.6 (`TINT`, `State`, `ChatName`, `Subtitle`, `Help`)
 and 5.7. Uses `Host.OnChange`, `Host.Game`, `Host.Cancel`, `Money.Format`,
 `Rules.DEFAULTS`, `ns.Print`, and from section 7: `UIParent`,
-`CreateFrame`, `UnitFactionGroup`, `GetUnitName`, `Ambiguate`, `GetTime`,
+`CreateFrame`, `UnitFactionGroup`, `Host.PlayerName`, `GetTime`,
 `GameTooltip`, the font objects, and the templates `BackdropTemplate` and
 `UIPanelScrollFrameTemplate` (the latter is set up here as a helper the
 state packages call to make a list box).
